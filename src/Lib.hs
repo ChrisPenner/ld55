@@ -10,16 +10,26 @@ import Control.Monad
 import Data.Generics.Labels ()
 import Data.IORef
 import Data.Time.Clock.System
-import FRP.Yampa hiding ((*^))
+import FRP.Yampa hiding (normalize, (*^))
 import SDL hiding (Stereo, Vector, copy)
 import System.Exit
 import Types
 import Resources (loadResources)
+import Data.Traversable
+import Data.Foldable
+import Data.Int
+import SDL.Input.GameController (ControllerButton(..), ControllerAxis (..))
+import SDL.Internal.Numbered (toNumber)
+import Debug.Trace (traceM)
 
 main :: IO ()
 main = do
   -- ALUT.withProgNameAndArgs ALUT.runALUT $ \_ _ -> do
   initializeAll
+
+  jsds <- fmap toList availableJoysticks
+  jss <- for jsds openJoystick
+  let num_players = 1 + length jss
 
   window <-
     createWindow "ld55" $
@@ -55,10 +65,10 @@ main = do
   tRef <- newIORef seconds
 
   reactimate
-    (pure $ FrameInfo defaultControls engine)
-    (input engine tRef Nothing)
+    (pure $ FrameInfo (replicate num_players defaultControls) engine)
+    (input engine tRef jss)
     (output engine)
-    game
+    (game num_players)
   quit
 
 parseControls :: (Scancode -> Bool) -> Controller
@@ -84,8 +94,42 @@ parseControls isKeyDown =
     , c_vButton = isKeyDown ScancodeV
     }
 
-input :: Engine -> IORef Double -> Maybe Joystick -> Bool -> IO (Double, Maybe FrameInfo)
-input engine tRef _ _ = do
+
+controllerButton :: Joystick -> ControllerButton -> IO Bool
+controllerButton js = buttonPressed js . fromIntegral . toNumber
+
+parseController :: Joystick -> IO Controller
+parseController js = do
+  a <- controllerButton js ControllerButtonA
+  b <- controllerButton js ControllerButtonB
+  x <- controllerButton js ControllerButtonX
+  y <- controllerButton js ControllerButtonY
+  l <- controllerButton js ControllerButtonBack
+  r <- controllerButton js ControllerButtonGuide
+  ok <- controllerButton js ControllerButtonRightShoulder
+
+  dx <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftX
+  dy <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftY
+  shoot <- fmap (<= 8000) $ axisPosition js $ fromIntegral $ toNumber ControllerAxisTriggerRight
+
+  pure $ Controller
+    { c_zButton = a
+    , c_xButton = b
+    , c_cButton = x
+    , c_vButton = y
+    , c_okButton = shoot
+    , c_leftStick = normalize $ fmap ((/ 32767)) $ fmap (\z -> if abs z < 8000 then 0 else z) $ fmap fromIntegral $ V2 dx dy
+    }
+
+
+clampAxis :: Int16 -> Int
+clampAxis (fromIntegral @_ @Int -> i) =
+  if abs i <= 8000
+     then 0
+     else signum i
+
+input :: Engine -> IORef Double -> [Joystick] -> Bool -> IO (Double, Maybe FrameInfo)
+input engine tRef jss _ = do
   let win = e_window engine
   pumpEvents
   es <- pollEvents
@@ -100,9 +144,9 @@ input engine tRef _ _ = do
   let dt = seconds' - seconds
 
   keys <- getKeyboardState
-  -- js <- for mjs parseController
+  js <- for jss parseController
 
-  pure (dt, Just $ FrameInfo (parseControls keys) engine)
+  pure (dt, Just $ FrameInfo (parseControls keys : js) engine)
 
 pattern Keypress :: Scancode -> EventPayload
 pattern Keypress scan <- KeyboardEvent (KeyboardEventData _ Pressed _ (Keysym scan _ _))
