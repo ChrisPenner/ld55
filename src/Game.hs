@@ -119,16 +119,16 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
 
   let commands =
         shoot & foldMap \() ->
-          [ Spawn
+          fmap
+          ( Spawn
              Nothing
              GState
                { gs_position = gs_position $ oi_state oi
                , gs_color = V4 0 0 0 254
                , gs_size = 5
                }
-             $ fireBall
-             $ dirFacing * 300
-          ]
+          ) $ makeSpells (dirFacing * 300)
+                     (parseSpell Attack pendingRunes)
 
   let newState = oi_state oi & #gs_position +~ dPos
       pos = gs_position newState
@@ -161,7 +161,7 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
                   (i, rt) <- zip [id @Int 0..] pendingRunes
                   let ore = mkGroundOriginRect $ V2 17 25
                   pure
-                    $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
+                    $ drawGameTextureOriginRect (runeTexture rt) ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
                     $ pure False
               , draw_rune1
               , draw_rune2
@@ -171,10 +171,10 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
           , oo_state = newState
           }
       , event id (const $ const []) shoot $ pendingRunes
-          <> onEvent r1 runeTexture
-          <> onEvent r2 runeTexture
-          <> onEvent r3 runeTexture
-          <> onEvent r4 runeTexture
+          <> onEvent r1 id
+          <> onEvent r2 id
+          <> onEvent r3 id
+          <> onEvent r4 id
       )
 
 renderGState :: GState -> Renderable
