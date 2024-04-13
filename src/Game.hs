@@ -15,7 +15,7 @@ import Data.Ord (clamp)
 import Data.Word
 import Drawing
 import FRP.Yampa hiding (dot, normalize, (*^))
-import GHC.Generics
+import GHC.Generics hiding (to)
 import ParseSpell (parseSpell)
 import Router
 import SDL hiding (Event, Stereo, Vector, copy, delay)
@@ -186,9 +186,14 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
             )
             $ maybe []
                 (makeSpells selfKey (dirFacing * 300))
-                $ parseSpell Attack pendingRunes
-
-  let newState = oi_state oi & #gs_position +~ dPos
+                $ parseSpell Move pendingRunes
+  let getLetters =  oi ^. #oi_inbox . to oie_mailbox
+  let mayTeleportTo = (getLetters Teleport ^? _head) <&> snd
+  let newState = oi_state oi
+                   & #gs_position +~ dPos
+                   & \s -> case mayTeleportTo of
+                             Just p -> s & #gs_position .~ p
+                             Nothing -> s
       pos = gs_position newState
 
       anim =
