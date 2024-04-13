@@ -125,6 +125,7 @@ data ObjectInput msg k s = ObjectInput
     oi_everyone :: Map k s,
     oi_inbox :: ObjectInEvents msg k
   }
+  deriving stock (Generic)
 
 oi_state :: Ord k => ObjectInput msg k s -> s
 oi_state oi = fromMaybe (error "uh oh; no state!") $ M.lookup (oi_self oi) $ oi_everyone oi

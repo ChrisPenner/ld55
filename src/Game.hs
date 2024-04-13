@@ -66,9 +66,21 @@ ourDude :: Dude
 ourDude = proc oi -> do
   dPos <- playerLogic -< fi_controls $ oi_fi oi
   okPressed <- edge -< c_okButton . fi_controls $ oi_fi oi
+  dirFacing <-
+    hold (V2 1 0)
+      <<< edgeBy
+        ( \_ vel ->
+            if vel /= 0
+              then Just vel
+              else Nothing
+        )
+        0
+      -<
+        oi ^. #oi_fi . #fi_controls . #c_leftStick
+
   let commands =
         okPressed & foldMap \() ->
-          [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (V2 100 0)
+          [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (dirFacing * 100)
           ]
 
   let newState = oi_state oi & #gs_position +~ dPos
