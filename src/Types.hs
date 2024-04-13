@@ -41,10 +41,11 @@ data Engine = Engine
 
 data Controller = Controller
   { c_leftStick :: V2 Double
-  , c_okButton :: Bool
-  , c_cancelButton :: Bool
+  , c_zButton :: Bool
+  , c_xButton :: Bool
   , c_cButton :: Bool
   , c_vButton :: Bool
+  , c_okButton :: Bool
   }
   deriving stock (Eq, Ord, Show, Generic)
 
@@ -52,10 +53,11 @@ defaultControls :: Controller
 defaultControls =
   Controller
     { c_leftStick = 0
-    , c_okButton = False
-    , c_cancelButton = False
+    , c_zButton = False
+    , c_xButton = False
     , c_cButton = False
     , c_vButton = False
+    , c_okButton = False
     }
 
 data FrameInfo = FrameInfo

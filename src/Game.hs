@@ -45,7 +45,7 @@ game =
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
       ObjectMap mempty $ M.fromList $
-        (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude))
+        (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude))
         : zip [1..] (fmap (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30},)
                $ makeSpells (V2 1 1)
                $ traceShowId $ parseSpell
@@ -104,10 +104,12 @@ ourDude :: Dude
 ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (r1, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_okButton c
-  (r2, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_cancelButton c
+  (r1, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_zButton c
+  (r2, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_xButton c
   (r3, draw_rune3) <- runeInput (V2 200 500) Texture_UnoSkip <<< edge -< c_cButton c
   (r4, draw_rune4) <- runeInput (V2 250 500) Texture_UnoPlusTwo <<< edge -< c_vButton c
+
+  shoot <- edge -< c_okButton c
 
   dirFacing <-
     hold (V2 1 0)
@@ -121,10 +123,18 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
       -<
         oi ^. #oi_fi . #fi_controls . #c_leftStick
 
---   let commands =
---         okPressed & foldMap \() ->
---           [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (dirFacing * 100)
---           ]
+  let commands =
+        shoot & foldMap \() ->
+          [ Spawn
+             Nothing
+             GState
+               { gs_position = gs_position $ oi_state oi
+               , gs_color = V4 0 0 0 254
+               , gs_size = 5
+               }
+             $ fireBall
+             $ dirFacing * 300
+          ]
 
   let newState = oi_state oi & #gs_position +~ dPos
       pos = gs_position newState
@@ -132,7 +142,7 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
     -<
       ( ObjectOutput
           { oo_outbox = mempty
-          , oo_commands = mempty -- commands
+          , oo_commands = commands
           , oo_render = mconcat
               [ renderGState newState
               , mconcat $ do
@@ -148,7 +158,7 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
               ]
           , oo_state = newState
           }
-      , pendingRunes
+      , event id (const $ const []) shoot $ pendingRunes
           <> onEvent' r1 Texture_UnoSkip
           <> onEvent' r2 Texture_UnoWild
           <> onEvent' r3 Texture_UnoSkip
