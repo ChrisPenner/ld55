@@ -4,6 +4,7 @@
 
 module Drawing where
 
+import Geometry
 import SDL hiding (Stereo, Vector)
 import Types
 import Data.Word
