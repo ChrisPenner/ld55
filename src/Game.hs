@@ -7,7 +7,7 @@ import Data.Generics.Labels ()
 import Data.Map qualified as M
 import Data.Word
 import Drawing
-import FRP.Yampa hiding (now, (*^))
+import FRP.Yampa hiding ((*^))
 import GHC.Generics
 import Router
 import SDL hiding (Stereo, Vector, copy)
@@ -22,8 +22,8 @@ game =
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
-  now <- localTime -< ()
-  returnA -< (now - old, now)
+  nowish <- localTime -< ()
+  returnA -< (nowish - old, nowish)
 
 playerLogic :: SF (Controller) (V2 Double)
 playerLogic = proc c -> do
@@ -43,18 +43,24 @@ data FireballState = FireballState
 fireBall :: V2 Double -> Dude
 fireBall velocity = proc oi -> do
   dt <- deltaTime -< ()
-  let newState = oi_state oi & #gs_position +~ dt *^ velocity
+  t <- localTime -< ()
+  let timeLeft = ttl - t
+  e <- delayEvent ttl <<< now () -< ()
+  let newState =
+        oi_state oi
+          & #gs_position +~ dt *^ velocity
+          & #gs_color . _w .~ round (timeLeft * 255 / ttl)
+  let commands = e & foldMap \() -> [Unspawn]
   returnA
     -<
       ObjectOutput
         { oo_outbox = mempty,
-          oo_commands = mempty,
-          oo_render =
-            drawFilledRect (gs_color newState) $
-              Rectangle (P (gs_position newState)) $
-                gs_size newState,
+          oo_commands = commands,
+          oo_render = renderGState newState,
           oo_state = newState
         }
+  where
+    ttl = 2
 
 ourDude :: Dude
 ourDude = proc oi -> do
