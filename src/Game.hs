@@ -145,6 +145,7 @@ runRuneSet pos cty r1 r2 r3 r4 = proc c -> do
 ourDude :: Int -> ControllerType -> Dude
 ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = (!! ctrlix) $ fi_controls $ oi_fi oi
+  let selfKey = oi_self oi
   dPos <- playerLogic -< c
   (draw_runes, new_runes) <-
     runRuneSet
@@ -184,7 +185,7 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
                   }
             )
             $ maybe []
-                (makeSpells (dirFacing * 300))
+                (makeSpells selfKey (dirFacing * 300))
                 $ parseSpell Attack pendingRunes
 
   let newState = oi_state oi & #gs_position +~ dPos
@@ -251,46 +252,51 @@ onEvent' :: (Applicative f, Monoid (f b)) => Event a -> b -> f b
 onEvent' ev = onEvent ev . const
 
 spellContinuation ::
+  Key ->
   Time ->
   V2 Double ->
   Maybe Spell ->
-  SF GState (Double, [Command GameMsg GameCommand Key GState])
-spellContinuation ttl dir k = proc s -> do
+  SF GState (Double, Event() {- is about to die -}, [Command GameMsg GameCommand Key GState])
+spellContinuation playerKey ttl dir k = proc s -> do
   (perc, on_die, die_cmds) <- withLifetime ttl -< ()
   returnA
     -<
       ( perc,
+        on_die,
         mconcat
           [ die_cmds,
             join $ onEvent' on_die $ do
               spell <- maybeToList k
-              dude <- makeSpells dir spell
+              dude <- makeSpells playerKey dir spell
               pure $ Spawn Nothing s dude
           ]
       )
 
-makeSpells :: V2 Double -> Spell -> [Dude]
-makeSpells _ (Standard _) = []
-makeSpells (normalize -> dir) (Projectile _ k) =
+makeSpells :: Key -> V2 Double -> Spell -> [Dude]
+makeSpells _playerKey _ (Standard _) = []
+makeSpells playerKey (normalize -> dir) (Projectile payload k) =
   pure $ proc oi -> do
-    (_, cmds) <- spellContinuation 1 dir k -< oi_state oi
+    (_, isDying, cmds) <- spellContinuation playerKey 1 dir k -< oi_state oi
     dt <- deltaTime -< ()
     let st =
           oi_state oi
             & #gs_position +~ dir * 400 ^* dt
             & #gs_size .~ 10
             & #gs_color .~ V4 0 0 0 255
+    let outBox = case payload of
+          MovementDesc{} -> onEvent' isDying (playerKey, SomeMsg Teleport $ st ^. #gs_position)
+          _ -> mempty
     returnA
       -<
         ObjectOutput
-          { oo_outbox = mempty,
+          { oo_outbox = outBox,
             oo_commands = cmds,
             oo_render = renderGState st,
             oo_state = st
           }
-makeSpells dir (Explosion _ k) =
+makeSpells playerKey dir (Explosion _ k) =
   pure $ proc oi -> do
-    (perc, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
+    (perc, _isDying, cmds) <- spellContinuation playerKey spellTtl dir k -< oi_state oi
     let st =
           oi_state oi
             & #gs_size .~ perc *^ 100
@@ -303,9 +309,9 @@ makeSpells dir (Explosion _ k) =
             oo_render = renderGState st,
             oo_state = st
           }
-makeSpells dir (Concurrent x y) =
-  makeSpells (mkRotMatrix (pi / 10) !* dir) x
-    <> makeSpells (mkRotMatrix (-pi / 10) !* dir) y
+makeSpells playerKey dir (Concurrent x y) =
+  makeSpells playerKey (mkRotMatrix (pi / 10) !* dir) x
+    <> makeSpells playerKey (mkRotMatrix (-pi / 10) !* dir) y
 
 mkRotMatrix :: Double -> M22 Double
 mkRotMatrix theta =

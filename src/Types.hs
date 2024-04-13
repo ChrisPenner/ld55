@@ -95,8 +95,10 @@ data Message a
 
 type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
-data GameMsg k
-  deriving (Eq, Ord, Show, Generic)
+data GameMsg k where
+  Teleport :: GameMsg (V2 Double)
+
+deriving stock instance Eq (GameMsg k)
 
 data GameCommand
   deriving (Eq, Ord, Show, Generic)
