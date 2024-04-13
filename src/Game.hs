@@ -89,8 +89,8 @@ ourDude :: Dude
 ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (okPressed, draw_rune1) <- rune (V2 100 500) Texture_Rune1 <<< edge -< c_okButton c
-  (cancelPressed, draw_rune2) <- rune (V2 200 500) Texture_Rune2 <<< edge -< c_cancelButton c
+  (okPressed, draw_rune1) <- runeInput (V2 100 500) Texture_Rune1 <<< edge -< c_okButton c
+  (cancelPressed, draw_rune2) <- runeInput (V2 200 500) Texture_Rune2 <<< edge -< c_cancelButton c
 
   dirFacing <-
     hold (V2 1 0)
@@ -227,8 +227,8 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
   next_ok <- edge -< next_ok_at <= t
   returnA -< ((clamp (0, 1) ((next_ok_at - t) / wait), gated_ev, next_ok), next_ok_at)
 
-rune :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
-rune pos gt = proc ev -> do
+runeInput :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
+runeInput pos gt = proc ev -> do
   (perc_available, on_use, on_refresh) <- cooldown 2 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
   want_halo <- fmap getAny $ hold (Any False) -< mergeEvents
