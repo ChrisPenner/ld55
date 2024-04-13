@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -110,12 +110,14 @@ library
     , ldtk-types
     , lens
     , linear
+    , megaparsec
     , mtl
     , nspace
     , sdl2
     , text
     , time
     , vector
+    , witherable
   default-language: Haskell2010
 
 executable ld55-exe
@@ -198,12 +200,14 @@ executable ld55-exe
     , ldtk-types
     , lens
     , linear
+    , megaparsec
     , mtl
     , nspace
     , sdl2
     , text
     , time
     , vector
+    , witherable
   default-language: Haskell2010
 
 test-suite ld55-test
@@ -287,10 +291,12 @@ test-suite ld55-test
     , ldtk-types
     , lens
     , linear
+    , megaparsec
     , mtl
     , nspace
     , sdl2
     , text
     , time
     , vector
+    , witherable
   default-language: Haskell2010

@@ -38,6 +38,8 @@ dependencies:
 - nspace
 - OpenGL
 - bytestring
+- megaparsec
+- witherable
 
 default-extensions:
 - Arrows

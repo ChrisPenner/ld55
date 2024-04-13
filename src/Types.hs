@@ -14,6 +14,7 @@ module Types
   )
 where
 
+import Data.Bool (bool)
 import Data.Generics.Labels ()
 import Data.Kind
 import Data.Map (Map)
@@ -25,10 +26,9 @@ import Data.Word
 import Debug.Trace (traceShowId)
 import FRP.Yampa (SF)
 import FRP.Yampa qualified as Y
+import Foreign.C
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
-import Foreign.C
-import Data.Bool (bool)
 
 type Color = V4 Word8
 
@@ -36,29 +36,29 @@ type Renderable = Engine -> IO ()
 
 data Engine = Engine
   { e_renderer :: Renderer,
-    e_window :: Window
-  , e_resources :: Resources
+    e_window :: Window,
+    e_resources :: Resources
   }
 
 data Controller = Controller
-  { c_leftStick :: V2 Double
-  , c_zButton :: Bool
-  , c_xButton :: Bool
-  , c_cButton :: Bool
-  , c_vButton :: Bool
-  , c_okButton :: Bool
+  { c_leftStick :: V2 Double,
+    c_zButton :: Bool,
+    c_xButton :: Bool,
+    c_cButton :: Bool,
+    c_vButton :: Bool,
+    c_okButton :: Bool
   }
   deriving stock (Eq, Ord, Show, Generic)
 
 defaultControls :: Controller
 defaultControls =
   Controller
-    { c_leftStick = 0
-    , c_zButton = False
-    , c_xButton = False
-    , c_cButton = False
-    , c_vButton = False
-    , c_okButton = False
+    { c_leftStick = 0,
+      c_zButton = False,
+      c_xButton = False,
+      c_cButton = False,
+      c_vButton = False,
+      c_okButton = False
     }
 
 data FrameInfo = FrameInfo
@@ -192,22 +192,23 @@ data Spell
   | Concurrent Spell Spell
   deriving stock (Eq, Ord, Show, Generic)
 
-data Rune
+type Rune = Either RuneModifier RuneAction
+
+data RuneModifier
   = Rune2x
-  | RuneProjectile
-  | RuneExplosion
   | RuneAndThen
-  | RuneNegate
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
+data RuneAction = RuneProjectile | RuneExplosion
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
 data Finisher = Attack | Defend | Move
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
-
 data Resources = Resources
-  { r_font :: Char -> Texture
-  , r_textures :: GameTexture -> WrappedTexture
-  , r_spritesheet :: LpcGuy -> WrappedTexture
+  { r_font :: Char -> Texture,
+    r_textures :: GameTexture -> WrappedTexture,
+    r_spritesheet :: LpcGuy -> WrappedTexture
   }
   deriving stock (Generic)
 
@@ -215,13 +216,12 @@ data LpcGuy = Wizard
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
 data WrappedTexture = WrappedTexture
-  { getTexture    :: Texture
-  , wt_sourceRect :: Maybe (Rectangle CInt)
-  , wt_size       :: V2 CInt
-  , wt_origin     :: V2 CInt
+  { getTexture :: Texture,
+    wt_sourceRect :: Maybe (Rectangle CInt),
+    wt_size :: V2 CInt,
+    wt_origin :: V2 CInt
   }
-  deriving stock Generic
-
+  deriving stock (Generic)
 
 data GameTexture
   = Texture_Rune1
@@ -237,7 +237,6 @@ data GameTexture
   | Texture_Background
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
-
 data Dir = DirUp | DirLeft | DirDown | DirRight
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
@@ -248,18 +247,15 @@ data Anim = LpcAnim Dir AnimName
   deriving stock (Eq, Ord, Show, Generic)
 
 data DrawSpriteDetails = DrawSpriteDetails
-  { dsd_anim :: Anim
-  , dsd_rotation :: Double
-  , dsd_flips :: V2 Bool
+  { dsd_anim :: Anim,
+    dsd_rotation :: Double,
+    dsd_flips :: V2 Bool
   }
   deriving stock (Eq, Ord, Show, Generic)
 
-
-
-
 data OriginRect aff = OriginRect
-  { orect_size   :: V2 aff
-  , orect_offset :: V2 aff
+  { orect_size :: V2 aff,
+    orect_offset :: V2 aff
   }
   deriving (Eq, Ord, Show, Functor, Generic)
 
@@ -268,17 +264,16 @@ orTopLeft pos ore = pos - orect_offset ore
 
 originRectToRect :: Num a => OriginRect a -> V2 a -> Rectangle a
 originRectToRect ore pos =
-  Rectangle (P $ orTopLeft pos ore)
-    $ orect_size ore
-
-
+  Rectangle (P $ orTopLeft pos ore) $
+    orect_size ore
 
 wrappedToOriginRect :: WrappedTexture -> OriginRect Double
-wrappedToOriginRect wt = fmap fromIntegral $ OriginRect
-  { orect_size = wt_size wt
-  , orect_offset = wt_origin wt
-  }
-
+wrappedToOriginRect wt =
+  fmap fromIntegral $
+    OriginRect
+      { orect_size = wt_size wt,
+        orect_offset = wt_origin wt
+      }
 
 mkCenterdOriginRect :: Fractional a => V2 a -> OriginRect a
 mkCenterdOriginRect sz = OriginRect sz (sz / 2)

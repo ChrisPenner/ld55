@@ -1,27 +1,26 @@
-{-# LANGUAGE BlockArguments            #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Game where
 
+import Control.Applicative
 import Control.Lens
 import Control.Monad
 import Data.Generics.Labels ()
 import Data.Map qualified as M
 import Data.Maybe (maybeToList)
+import Data.Monoid
+import Data.Ord (clamp)
 import Data.Word
 import Drawing
 import FRP.Yampa hiding (dot, normalize, (*^))
 import GHC.Generics
 import ParseSpell (parseSpell)
 import Router
-import SDL hiding (delay, Event, Stereo, Vector, copy)
+import SDL hiding (Event, Stereo, Vector, copy, delay)
 import Types
 import Prelude hiding (last)
-import Data.Ord (clamp)
-import Data.Monoid
-import Control.Applicative
-
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -36,28 +35,26 @@ screenSize = V2 (h * aspectRatio) h
 
 game :: SF FrameInfo Renderable
 game =
-  fmap (\z ->
-    mconcat
-     [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False
-     , z
-     , drawText 16 (V3 0 0 0) "yo what up" 30
-     ]
-       ) $
-  fmap (foldMap oo_render) $
-    router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
-      ObjectMap mempty $ M.fromList $
-        (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude))
-        : zip [1..] (fmap (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30},)
-               $ makeSpells (V2 1 1)
-               $ traceShowId $ parseSpell
-                        Attack
-                        [ Rune2x,
-                          RuneProjectile,
-                          RuneAndThen,
-                          RuneNegate,
-                          RuneExplosion
-                        ]
-                    )
+  fmap
+    ( \z ->
+        mconcat
+          [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False,
+            z,
+            drawText 16 (V3 0 0 0) "yo what up" 30
+          ]
+    )
+    $ fmap (foldMap oo_render)
+    $ router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty
+    $ ObjectMap mempty
+    $ M.fromList
+    $ (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude))
+      : zip
+        [1 ..]
+        ( fmap (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30},) $
+            case parseSpell Attack [Left Rune2x, Right RuneProjectile, Left RuneAndThen, Right RuneExplosion] of
+              Just s -> makeSpells (V2 1 1) $ traceShowId $ s
+              Nothing -> []
+        )
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -114,29 +111,30 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
 
   let vel = oi ^. #oi_fi . #fi_controls . #c_leftStick
 
-  dirFacing <- fmap normalize $
-    hold (V2 1 0)
-      <<< edgeBy
-        ( \_ vel ->
-            if vel /= 0
-              then Just vel
-              else Nothing
-        )
-        0
-      -< vel
-
+  dirFacing <-
+    fmap normalize $
+      hold (V2 1 0)
+        <<< edgeBy
+          ( \_ vel ->
+              if vel /= 0
+                then Just vel
+                else Nothing
+          )
+          0
+      -<
+        vel
 
   let commands =
         shoot & foldMap \() ->
           [ Spawn
-             Nothing
-             GState
-               { gs_position = gs_position $ oi_state oi
-               , gs_color = V4 0 0 0 254
-               , gs_size = 5
-               }
-             $ fireBall
-             $ dirFacing * 300
+              Nothing
+              GState
+                { gs_position = gs_position $ oi_state oi,
+                  gs_color = V4 0 0 0 254,
+                  gs_size = 5
+                }
+              $ fireBall
+              $ dirFacing * 300
           ]
 
   let newState = oi_state oi & #gs_position +~ dPos
@@ -147,49 +145,51 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
           True -> Slash
           False -> Walk
 
-      dir = if
-              | dot dirFacing (V2 (-1) 0) > 0.7 -> DirLeft
-              | dot dirFacing (V2 1 0) > 0.7 -> DirRight
-              | dot dirFacing (V2 0 1) > 0.7 -> DirDown
-              | dot dirFacing (V2 0 (-1)) > 0.7 -> DirUp
-              | otherwise -> DirDown
-
+      dir =
+        if
+            | dot dirFacing (V2 (-1) 0) > 0.7 -> DirLeft
+            | dot dirFacing (V2 1 0) > 0.7 -> DirRight
+            | dot dirFacing (V2 0 1) > 0.7 -> DirDown
+            | dot dirFacing (V2 0 (-1)) > 0.7 -> DirUp
+            | otherwise -> DirDown
 
   sprite <- mkAnim Wizard -< (DrawSpriteDetails (LpcAnim dir anim) 0 $ pure False, pos)
 
   returnA
     -<
       ( ObjectOutput
-          { oo_outbox = mempty
-          , oo_commands = commands
-          , oo_render = mconcat
-              [ sprite
-              , mconcat $ do
-                  let stride = 20
-                      offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
-                  (i, rt) <- zip [id @Int 0..] pendingRunes
-                  let ore = mkCenterdOriginRect $ V2 17 25
-                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-30)) 0 (pure False)
-              , draw_rune1
-              , draw_rune2
-              , draw_rune3
-              , draw_rune4
-              ]
-          , oo_state = newState
-          }
-      , event id (const $ const []) shoot $ pendingRunes
-          <> onEvent' r1 Texture_UnoSkip
-          <> onEvent' r2 Texture_UnoWild
-          <> onEvent' r3 Texture_UnoSkip
-          <> onEvent' r4 Texture_UnoPlusTwo
+          { oo_outbox = mempty,
+            oo_commands = commands,
+            oo_render =
+              mconcat
+                [ sprite,
+                  mconcat $ do
+                    let stride = 20
+                        offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
+                    (i, rt) <- zip [id @Int 0 ..] pendingRunes
+                    let ore = mkCenterdOriginRect $ V2 17 25
+                    pure $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-30)) 0 (pure False),
+                  draw_rune1,
+                  draw_rune2,
+                  draw_rune3,
+                  draw_rune4
+                ],
+            oo_state = newState
+          },
+        event id (const $ const []) shoot $
+          pendingRunes
+            <> onEvent' r1 Texture_UnoSkip
+            <> onEvent' r2 Texture_UnoWild
+            <> onEvent' r3 Texture_UnoSkip
+            <> onEvent' r4 Texture_UnoPlusTwo
       )
 
 renderGState :: GState -> Renderable
 renderGState gs =
-  drawOriginRect (gs_color gs)
+  drawOriginRect
+    (gs_color gs)
     (mkCenterdOriginRect $ gs_size gs)
     (gs_position gs)
-
 
 withLifetime :: Time -> SF a (Double, Event (), [Command msg c k s])
 withLifetime ttl = proc _ -> do
@@ -247,27 +247,27 @@ makeSpells (normalize -> dir) (Projectile _ k) =
 makeSpells dir (Explosion _ k) =
   pure $ proc oi -> do
     (perc, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
-    let st = oi_state oi
-          & #gs_size .~ perc *^ 100
-          & #gs_color .~ V4 255 0 255 128
-    returnA -<
-      ObjectOutput
-        { oo_outbox = mempty
-        , oo_commands = cmds
-        , oo_render = renderGState st
-        , oo_state = st
-        }
+    let st =
+          oi_state oi
+            & #gs_size .~ perc *^ 100
+            & #gs_color .~ V4 255 0 255 128
+    returnA
+      -<
+        ObjectOutput
+          { oo_outbox = mempty,
+            oo_commands = cmds,
+            oo_render = renderGState st,
+            oo_state = st
+          }
 makeSpells dir (Concurrent x y) =
   makeSpells (mkRotMatrix (pi / 10) !* dir) x
-   <> makeSpells (mkRotMatrix (-pi / 10) !* dir) y
-
+    <> makeSpells (mkRotMatrix (-pi / 10) !* dir) y
 
 mkRotMatrix :: Double -> M22 Double
 mkRotMatrix theta =
   V2
     (V2 (cos theta) (negate $ sin theta))
     (V2 (sin theta) (cos theta))
-
 
 cooldown :: Time -> SF (Event a) (Double, Event a, Event ())
 cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
@@ -284,22 +284,24 @@ runeInput :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
 runeInput pos gt = proc ev -> do
   (perc_available, on_use, on_refresh) <- cooldown 3 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
-  want_halo <- fmap getAny $ hold (Any False) -< asum
-    [ Any True  <$ on_refresh
-    , Any False <$ end_refresh
-    ]
+  want_halo <-
+    fmap getAny $ hold (Any False)
+      -<
+        asum
+          [ Any True <$ on_refresh,
+            Any False <$ end_refresh
+          ]
 
   let ore = mkCenterdOriginRect $ V2 35 50
 
-  returnA -<
-    ( on_use
-    , mconcat
-        [ drawGameTextureOriginRect gt ore pos 0 (pure False)
-        , drawOriginRect (V4 0 0 0 (round $ if perc_available == 0 then 0 else max 92 (perc_available * 255))) ore pos
-        , if want_halo
+  returnA
+    -<
+      ( on_use,
+        mconcat
+          [ drawGameTextureOriginRect gt ore pos 0 (pure False),
+            drawOriginRect (V4 0 0 0 (round $ if perc_available == 0 then 0 else max 92 (perc_available * 255))) ore pos,
+            if want_halo
               then drawOriginRect (V4 255 255 0 64) ore pos
               else mempty
-        ]
-    )
-
-
+          ]
+      )
