@@ -8,7 +8,7 @@ import Data.Generics.Labels ()
 import Data.Map qualified as M
 import Data.Word
 import Drawing
-import FRP.Yampa hiding ((*^))
+import FRP.Yampa hiding (normalize, (*^))
 import GHC.Generics
 import Router
 import SDL hiding (Event, Stereo, Vector, copy)
@@ -22,12 +22,12 @@ game =
       ObjectMap mempty $ M.fromList $
         [ (0, (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude))
         , (1, (GState {gs_position = 300, gs_color = V4 255 0 0 255, gs_size = 30}, head
-               $ makeSpells
-               $ Explosion undefined
+               $ makeSpells (V2 1 1)
+               $ Projectile undefined
                $ Just
                $ Explosion undefined
                $ Just
-               $ Explosion undefined Nothing
+               $ Projectile undefined Nothing
           ))
         ]
 
@@ -129,27 +129,49 @@ onEvent' :: (Applicative f, Monoid (f b)) => Event a -> b -> f b
 onEvent' ev = onEvent ev . const
 
 
-makeSpells :: Spell -> [Dude]
-makeSpells (Standard _) = []
-makeSpells (Projectile _ _) = undefined
-makeSpells (Explosion _ k) = pure $ proc oi -> do
-  (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
-  let st = oi_state oi
-         & #gs_size .~ perc *^ 100
-         & #gs_color .~ V4 255 0 255 128
-  returnA -<
-    ObjectOutput
-      { oo_outbox = mempty
-      , oo_commands = mconcat
-          [ die_cmds
-          , join $ onEvent' on_die $ do
-              spell <- maybeToList k
-              dude <- makeSpells spell
-              pure $ Spawn Nothing st dude
-          ]
-      , oo_render = renderGState st
-      , oo_state = st
-      }
-makeSpells (Concurrent x y) = makeSpells x <> makeSpells y
+makeSpells :: V2 Double -> Spell -> [Dude]
+makeSpells _ (Standard _) = []
+makeSpells (normalize -> dir) (Projectile _ k) =
+  pure $ proc oi -> do
+    (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
+    dt <- deltaTime -< ()
+    let st = oi_state oi
+          & #gs_position +~ dir * 400 ^* dt
+          & #gs_size .~ 10
+          & #gs_color .~ V4 0 0 0 255
+    returnA -<
+      ObjectOutput
+        { oo_outbox = mempty
+        , oo_commands = mconcat
+            [ die_cmds
+            , join $ onEvent' on_die $ do
+                spell <- maybeToList k
+                dude <- makeSpells dir spell
+                pure $ Spawn Nothing st dude
+            ]
+        , oo_render = renderGState st
+        , oo_state = st
+        }
+
+makeSpells dir (Explosion _ k) =
+  pure $ proc oi -> do
+    (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
+    let st = oi_state oi
+          & #gs_size .~ perc *^ 100
+          & #gs_color .~ V4 255 0 255 128
+    returnA -<
+      ObjectOutput
+        { oo_outbox = mempty
+        , oo_commands = mconcat
+            [ die_cmds
+            , join $ onEvent' on_die $ do
+                spell <- maybeToList k
+                dude <- makeSpells dir spell
+                pure $ Spawn Nothing st dude
+            ]
+        , oo_render = renderGState st
+        , oo_state = st
+        }
+makeSpells dir (Concurrent x y) = makeSpells dir x <> makeSpells dir y
 
 
