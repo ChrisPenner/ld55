@@ -10,12 +10,12 @@ import Witherable (mapMaybe)
 
 type Parser = Parsec Void [Rune]
 
-payloadWithinSpell :: Traversal' Spell Payload
-payloadWithinSpell f = \case
+payloads :: Traversal' Spell Payload
+payloads f = \case
   Standard p -> Standard <$> f p
-  Projectile p s -> Projectile <$> f p <*> pure s
-  Explosion p s -> Explosion <$> f p <*> pure s
-  Concurrent a b -> Concurrent <$> payloadWithinSpell f a <*> payloadWithinSpell f b
+  Projectile p s -> Projectile <$> f p <*> traverse (payloads f) s
+  Explosion p s -> Explosion <$> f p <*> traverse (payloads f) s
+  Concurrent a b -> Concurrent <$> payloads f a <*> payloads f b
 
 dupSpell :: Spell -> Spell
 dupSpell orig = setIfNothing orig orig
@@ -35,7 +35,7 @@ twoXSpell = \case
   Concurrent a b -> Concurrent (Concurrent a b) (Concurrent a b)
 
 negateSpell :: Spell -> Spell
-negateSpell = over payloadWithinSpell negatePayload
+negateSpell = over payloads negatePayload
   where
     negatePayload = \case
       DamageDesc d m -> DamageDesc (-d) (-m)
@@ -51,7 +51,7 @@ runSpellMods :: [RuneModifier] -> Spell -> Spell
 runSpellMods mods spell = foldr applyMod spell mods
   where
     applyMod = \case
-      Rune2x -> over payloadWithinSpell twoXPayload
+      Rune2x -> over payloads twoXPayload
       RuneAndThen -> dupSpell
     twoXPayload = \case
       DamageDesc d m -> DamageDesc (2 * d) (2 * m)
