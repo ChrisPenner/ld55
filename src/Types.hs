@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Types
@@ -159,18 +160,17 @@ deriving stock instance Traversable Y.Event
 
 data Payload
   = DamageDesc
-    { damageToDo :: Int
-    , fireModifier :: Int
-    }
+      { p_damageToDo :: Int,
+        p_fireModifier :: Int
+      }
   | MovementDesc
-    { speedModifier :: Float
-    }
+      { p_speedModifier :: Float
+      }
   deriving stock (Eq, Ord, Show, Generic)
-
 
 data Spell
   = Projectile Payload (Maybe Spell)
-  | Explosion Payload  (Maybe Spell)
+  | Explosion Payload (Maybe Spell)
   | Standard Payload
   | Concurrent Spell Spell
   deriving stock (Eq, Ord, Show, Generic)
@@ -183,3 +183,5 @@ data Rune
   | RuneNegate
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
+data Finisher = Attack | Defend | Move
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
