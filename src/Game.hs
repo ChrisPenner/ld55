@@ -222,7 +222,7 @@ makeSpells :: V2 Double -> Spell -> [Dude]
 makeSpells _ (Standard _) = []
 makeSpells (normalize -> dir) (Projectile _ k) =
   pure $ proc oi -> do
-    (_, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
+    (_, cmds) <- spellContinuation 1 dir k -< oi_state oi
     dt <- deltaTime -< ()
     let st =
           oi_state oi
@@ -275,7 +275,7 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
 
 runeInput :: V2 Double -> Rune -> SF (Event a) (Event Rune, Renderable)
 runeInput pos gt = proc ev -> do
-  (perc_available, on_use, on_refresh) <- cooldown 3 -< ev
+  (perc_available, on_use, on_refresh) <- cooldown 1.5 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
   want_halo <- fmap getAny $ hold (Any False) -< asum
     [ Any True  <$ on_refresh

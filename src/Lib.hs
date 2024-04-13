@@ -18,8 +18,9 @@ import Resources (loadResources)
 import Data.Traversable
 import Data.Foldable
 import Data.Int
-import SDL.Input.GameController (ControllerButton(..))
+import SDL.Input.GameController (ControllerButton(..), ControllerAxis (..))
 import SDL.Internal.Numbered (toNumber)
+import Debug.Trace (traceM)
 
 main :: IO ()
 main = do
@@ -107,14 +108,16 @@ parseController js = do
   r <- controllerButton js ControllerButtonGuide
   ok <- controllerButton js ControllerButtonRightShoulder
 
-  dx <- axisPosition js 0
-  dy <- axisPosition js 1
+  dx <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftX
+  dy <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftY
+  shoot <- fmap (<= 8000) $ axisPosition js $ fromIntegral $ toNumber ControllerAxisTriggerRight
+
   pure $ Controller
     { c_zButton = a
     , c_xButton = b
     , c_cButton = x
     , c_vButton = y
-    , c_okButton = ok
+    , c_okButton = shoot
     , c_leftStick = normalize $ fmap ((/ 32767)) $ fmap (\z -> if abs z < 8000 then 0 else z) $ fmap fromIntegral $ V2 dx dy
     }
 
