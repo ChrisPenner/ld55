@@ -1,4 +1,5 @@
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE BlockArguments            #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Game where
 
@@ -135,9 +136,11 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
           , oo_render = mconcat
               [ renderGState newState
               , mconcat $ do
-                  (i, rt) <- zip [0..] pendingRunes
+                  let stride = 20
+                      offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
+                  (i, rt) <- zip [id @Int 0..] pendingRunes
                   let ore = mkCenterdOriginRect $ V2 17 25
-                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (i * 20) (-30)) 0 (pure False)
+                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-30)) 0 (pure False)
               , draw_rune1
               , draw_rune2
               , draw_rune3
@@ -154,9 +157,10 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
 
 renderGState :: GState -> Renderable
 renderGState gs =
-  drawFilledRect (gs_color gs) $
-    Rectangle (P (gs_position gs)) $
-      gs_size gs
+  drawOriginRect (gs_color gs)
+    (mkCenterdOriginRect $ gs_size gs)
+    (gs_position gs)
+
 
 withLifetime :: Time -> SF a (Double, Event (), [Command msg c k s])
 withLifetime ttl = proc _ -> do
