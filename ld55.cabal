@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Lib
+      Router
+      Types
   other-modules:
       Paths_ld55
   autogen-modules:
@@ -85,6 +87,10 @@ library
       TypeSynonymInstances
       ViewPatterns
       OverloadedLabels
+      QuantifiedConstraints
+      UndecidableInstances
+      GADTs
+      TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
   build-depends:
       ALUT
@@ -168,6 +174,10 @@ executable ld55-exe
       TypeSynonymInstances
       ViewPatterns
       OverloadedLabels
+      QuantifiedConstraints
+      UndecidableInstances
+      GADTs
+      TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       ALUT
@@ -253,6 +263,10 @@ test-suite ld55-test
       TypeSynonymInstances
       ViewPatterns
       OverloadedLabels
+      QuantifiedConstraints
+      UndecidableInstances
+      GADTs
+      TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       ALUT

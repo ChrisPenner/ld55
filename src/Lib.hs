@@ -14,6 +14,7 @@ import FRP.Yampa hiding ((*^))
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
 import System.Exit
+import Types
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -25,11 +26,6 @@ screenSize :: RealFloat a => V2 a
 screenSize = V2 (h * aspectRatio) h
   where
     h = 540
-
-data Engine = Engine
-  { e_renderer :: Renderer,
-    e_window :: Window
-  }
 
 main :: IO ()
 main = do
@@ -73,8 +69,6 @@ main = do
     game
   quit
 
-type Color = V4 Word8
-
 drawBackgroundColor :: Color -> Renderable
 drawBackgroundColor c e = do
   let renderer = e_renderer e
@@ -115,27 +109,6 @@ playerLogic = loopPre defaultPlayerState $ proc (c, ps) -> do
   where
     playerSpeed :: V2 Double
     playerSpeed = 10
-
-data Controller = Controller
-  { c_leftStick :: V2 Double,
-    c_okButton :: Bool,
-    c_cancelButton :: Bool
-  }
-  deriving stock (Eq, Ord, Show, Generic)
-
-defaultControls :: Controller
-defaultControls =
-  Controller
-    { c_leftStick = 0,
-      c_okButton = False,
-      c_cancelButton = False
-    }
-
-data FrameInfo = FrameInfo
-  { fi_controls :: Controller,
-    fi_engine :: Engine
-  }
-  deriving stock (Generic)
 
 parseControls :: (Scancode -> Bool) -> Controller
 parseControls isKeyDown =
@@ -201,4 +174,3 @@ floatSeconds t =
   fromIntegral (systemSeconds t)
     + fromIntegral (systemNanoseconds t) / 1e9
 
-type Renderable = Engine -> IO ()

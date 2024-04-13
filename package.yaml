@@ -92,6 +92,10 @@ default-extensions:
 - TypeSynonymInstances
 - ViewPatterns
 - OverloadedLabels
+- QuantifiedConstraints
+- UndecidableInstances
+- GADTs
+- TypeFamilies
 
 
 
