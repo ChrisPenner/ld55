@@ -1,19 +1,19 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms   #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module Lib where
 
+import Control.Lens
+import Control.Monad
+import Data.Generics.Labels ()
+import Data.IORef
+import Data.Time.Clock.System
 import Data.Word
 import FRP.Yampa
-import           Control.Monad
-import           Data.Foldable (fold)
-import           Data.IORef
-import           Data.Time.Clock.System
-import           Data.Traversable (for)
-import           GHC.Generics
-import           SDL hiding (Vector, copy, Stereo)
-import qualified Sound.ALUT as ALUT
-import           System.Exit
+import GHC.Generics
+import SDL hiding (Stereo, Vector, copy)
+import System.Exit
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -27,32 +27,40 @@ screenSize = V2 (h * aspectRatio) h
     h = 540
 
 data Engine = Engine
-  { e_renderer :: Renderer
-  , e_window :: Window
+  { e_renderer :: Renderer,
+    e_window :: Window
   }
 
 main :: IO ()
-main = do -- ALUT.withProgNameAndArgs ALUT.runALUT $ \_ _ -> do
+main = do
+  -- ALUT.withProgNameAndArgs ALUT.runALUT $ \_ _ -> do
   initializeAll
 
-  window <- createWindow "ld55" $ defaultWindow
-    { windowInitialSize = fmap (round @Double) screenSize
-    , windowGraphicsContext = OpenGLContext defaultOpenGL
-    }
+  window <-
+    createWindow "ld55" $
+      defaultWindow
+        { windowInitialSize = fmap (round @Double) screenSize,
+          windowGraphicsContext = OpenGLContext defaultOpenGL
+        }
   ctx <- glCreateContext window
   glMakeCurrent window ctx
-  renderer <- createRenderer window (-1) defaultRenderer
-    { rendererType = AcceleratedRenderer
-    , rendererTargetTexture = True
-    }
+  renderer <-
+    createRenderer
+      window
+      (-1)
+      defaultRenderer
+        { rendererType = AcceleratedRenderer,
+          rendererTargetTexture = True
+        }
   rendererScale renderer $= screenSize / logicalSize
   rendererDrawBlendMode renderer $= BlendAlphaBlend
   cursorVisible $= False
 
-  let engine = Engine
-        { e_renderer = renderer
-        , e_window = window
-        }
+  let engine =
+        Engine
+          { e_renderer = renderer,
+            e_window = window
+          }
 
   tS <- getSystemTime
   let seconds = floatSeconds tS
@@ -74,30 +82,78 @@ drawBackgroundColor c e = do
   fillRect renderer Nothing
 
 game :: SF FrameInfo Renderable
-game = pure $ drawBackgroundColor $ V4 255 0 255 255
+game = proc FrameInfo {fi_controls} -> do
+  playerLogic' <- playerLogic -< fi_controls
+  returnA -< (drawBackgroundColor (V4 255 0 255 255) <> drawFilledRect (ps_color playerLogic') (Rectangle (P (ps_position playerLogic')) (V2 100 100)))
+
+drawFilledRect :: Color -> Rectangle Float -> Renderable
+drawFilledRect c (Rectangle (P v) sz) engine = do
+  let rect' = Rectangle (P v) $ sz
+  let renderer = e_renderer engine
+  rendererDrawColor renderer $= c
+  fillRect renderer $ Just $ fmap round rect'
+
+data PlayerState = PlayerState
+  { ps_position :: V2 Float,
+    ps_color :: V4 Word8
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+
+defaultPlayerState :: PlayerState
+defaultPlayerState =
+  PlayerState
+    { ps_position = 0,
+      ps_color = V4 255 0 0 255
+    }
+
+playerLogic :: SF Controller PlayerState
+playerLogic = loopPre defaultPlayerState $ proc (c, ps) -> do
+  let ps' = ps & #ps_position +~ c_leftStick c * playerSpeed
+  returnA -< (ps', ps')
+  where
+    playerSpeed :: V2 Float
+    playerSpeed = 10
 
 data Controller = Controller
-  { c_leftStick :: V2 Float
-  , c_okButton :: Bool
-  , c_cancelButton :: Bool
+  { c_leftStick :: V2 Float,
+    c_okButton :: Bool,
+    c_cancelButton :: Bool
   }
   deriving stock (Eq, Ord, Show, Generic)
 
 defaultControls :: Controller
-defaultControls = Controller
-  { c_leftStick = 0
-  , c_okButton = False
-  , c_cancelButton = False
-  }
+defaultControls =
+  Controller
+    { c_leftStick = 0,
+      c_okButton = False,
+      c_cancelButton = False
+    }
 
 data FrameInfo = FrameInfo
-  { fi_controls :: Controller
-  , fi_engine :: Engine
+  { fi_controls :: Controller,
+    fi_engine :: Engine
   }
   deriving stock (Generic)
 
 parseControls :: (Scancode -> Bool) -> Controller
-parseControls _ = defaultControls
+parseControls isKeyDown =
+  Controller
+    { c_leftStick =
+        V2
+          ( if
+                | isKeyDown ScancodeA -> -1
+                | isKeyDown ScancodeD -> 1
+                | otherwise -> 0
+          )
+          ( if
+                | isKeyDown ScancodeW -> -1
+                | isKeyDown ScancodeS -> 1
+                | otherwise -> 0
+          )
+          & SDL.normalize,
+      c_okButton = isKeyDown ScancodeZ,
+      c_cancelButton = isKeyDown ScancodeX
+    }
 
 input :: Engine -> IORef Double -> Maybe Joystick -> Bool -> IO (Double, Maybe FrameInfo)
 input engine tRef _ _ = do
@@ -119,18 +175,15 @@ input engine tRef _ _ = do
 
   pure (dt, Just $ FrameInfo (parseControls keys) engine)
 
-
 pattern Keypress :: Scancode -> EventPayload
 pattern Keypress scan <- KeyboardEvent (KeyboardEventData _ Pressed _ (Keysym scan _ _))
 
-
 isQuit :: EventPayload -> Bool
-isQuit QuitEvent                   = True
-isQuit (WindowClosedEvent _)       = True
-isQuit (Keypress ScancodeEscape)   = True
+isQuit QuitEvent = True
+isQuit (WindowClosedEvent _) = True
+isQuit (Keypress ScancodeEscape) = True
 isQuit (Keypress ScancodeCapsLock) = True
-isQuit _                           = False
-
+isQuit _ = False
 
 output :: Engine -> Bool -> Renderable -> IO Bool
 output e _ render = do
@@ -141,12 +194,9 @@ output e _ render = do
   present renderer
   pure False
 
-
 floatSeconds :: SystemTime -> Double
-floatSeconds t
-  = fromIntegral (systemSeconds t)
-  + fromIntegral (systemNanoseconds t) / 1e9
-
+floatSeconds t =
+  fromIntegral (systemSeconds t)
+    + fromIntegral (systemNanoseconds t) / 1e9
 
 type Renderable = Engine -> IO ()
-
