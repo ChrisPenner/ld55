@@ -2,34 +2,50 @@
 
 module Game where
 
-import Control.Monad
 import Control.Lens
+import Control.Monad
 import Data.Generics.Labels ()
 import Data.Map qualified as M
+import Data.Maybe (maybeToList)
 import Data.Word
 import Drawing
 import FRP.Yampa hiding (normalize, (*^))
 import GHC.Generics
+import ParseSpell (parseSpell)
 import Router
 import SDL hiding (Event, Stereo, Vector, copy)
 import Types
-import Data.Maybe (maybeToList)
 
 game :: SF FrameInfo Renderable
 game =
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
-      ObjectMap mempty $ M.fromList $
-        [ (0, (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude))
-        , (1, (GState {gs_position = 300, gs_color = V4 255 0 0 255, gs_size = 30}, head
-               $ makeSpells (V2 1 1)
-               $ Projectile undefined
-               $ Just
-               $ Explosion undefined
-               $ Just
-               $ Projectile undefined Nothing
-          ))
-        ]
+      ObjectMap mempty $
+        M.fromList $
+          [ (0, (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude)),
+            ( 1,
+              ( GState {gs_position = 300, gs_color = V4 255 0 0 255, gs_size = 30},
+                head $
+                  makeSpells
+                    (V2 1 1)
+                    ( parseSpell
+                        Attack
+                        [ Rune2x,
+                          RuneProjectile,
+                          RuneAndThen,
+                          RuneNegate,
+                          RuneExplosion
+                        ]
+                    )
+              )
+            )
+          ]
+
+-- \$ Projectile undefined
+-- \$ Just
+-- \$ Explosion undefined
+-- \$ Just
+-- \$ Projectile undefined Nothing
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -110,17 +126,14 @@ renderGState gs =
     Rectangle (P (gs_position gs)) $
       gs_size gs
 
-
 withLifetime :: Time -> SF a (Double, Event (), [Command msg c k s])
 withLifetime ttl = proc _ -> do
   t <- localTime -< ()
   e <- delayEvent ttl <<< now () -< ()
   returnA -< (t / ttl, e, onEvent' e Unspawn)
 
-
 spellTtl :: Double
 spellTtl = 0.5
-
 
 onEvent :: (Applicative f, Monoid (f b)) => Event a -> (a -> b) -> f b
 onEvent ev f = foldMap (pure . f) ev
@@ -128,24 +141,24 @@ onEvent ev f = foldMap (pure . f) ev
 onEvent' :: (Applicative f, Monoid (f b)) => Event a -> b -> f b
 onEvent' ev = onEvent ev . const
 
-spellContinuation
-    :: Time
-    -> V2 Double
-    -> Maybe Spell
-    -> SF GState (Double, [Command GameMsg GameCommand Key GState])
+spellContinuation ::
+  Time ->
+  V2 Double ->
+  Maybe Spell ->
+  SF GState (Double, [Command GameMsg GameCommand Key GState])
 spellContinuation ttl dir k = proc s -> do
-    (perc, on_die, die_cmds) <- withLifetime ttl -< ()
-    returnA -<
-      ( perc
-      , mconcat
-          [ die_cmds
-          , join $ onEvent' on_die $ do
+  (perc, on_die, die_cmds) <- withLifetime ttl -< ()
+  returnA
+    -<
+      ( perc,
+        mconcat
+          [ die_cmds,
+            join $ onEvent' on_die $ do
               spell <- maybeToList k
               dude <- makeSpells dir spell
               pure $ Spawn Nothing s dude
           ]
       )
-
 
 makeSpells :: V2 Double -> Spell -> [Dude]
 makeSpells _ (Standard _) = []
@@ -153,31 +166,32 @@ makeSpells (normalize -> dir) (Projectile _ k) =
   pure $ proc oi -> do
     (_, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
     dt <- deltaTime -< ()
-    let st = oi_state oi
-          & #gs_position +~ dir * 400 ^* dt
-          & #gs_size .~ 10
-          & #gs_color .~ V4 0 0 0 255
-    returnA -<
-      ObjectOutput
-        { oo_outbox = mempty
-        , oo_commands = cmds
-        , oo_render = renderGState st
-        , oo_state = st
-        }
-
+    let st =
+          oi_state oi
+            & #gs_position +~ dir * 400 ^* dt
+            & #gs_size .~ 10
+            & #gs_color .~ V4 0 0 0 255
+    returnA
+      -<
+        ObjectOutput
+          { oo_outbox = mempty,
+            oo_commands = cmds,
+            oo_render = renderGState st,
+            oo_state = st
+          }
 makeSpells dir (Explosion _ k) =
   pure $ proc oi -> do
     (perc, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
-    let st = oi_state oi
-          & #gs_size .~ perc *^ 100
-          & #gs_color .~ V4 255 0 255 128
-    returnA -<
-      ObjectOutput
-        { oo_outbox = mempty
-        , oo_commands = cmds
-        , oo_render = renderGState st
-        , oo_state = st
-        }
+    let st =
+          oi_state oi
+            & #gs_size .~ perc *^ 100
+            & #gs_color .~ V4 255 0 255 128
+    returnA
+      -<
+        ObjectOutput
+          { oo_outbox = mempty,
+            oo_commands = cmds,
+            oo_render = renderGState st,
+            oo_state = st
+          }
 makeSpells dir (Concurrent x y) = makeSpells dir x <> makeSpells dir y
-
-

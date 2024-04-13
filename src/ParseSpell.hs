@@ -1,7 +1,6 @@
 module ParseSpell where
 
 import Control.Lens
-import Data.Set (Set)
 import Types
 
 payloadWithinSpell :: Traversal' Spell Payload
