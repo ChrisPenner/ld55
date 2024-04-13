@@ -85,7 +85,15 @@ data Message a
 
 type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
-type Dude = ObjSF Proxy () Int GState
+data GameMsg k
+  deriving (Eq, Ord, Show, Generic)
+
+data GameCommand
+  deriving (Eq, Ord, Show, Generic)
+
+type Key = Int
+
+type Dude = ObjSF GameMsg GameCommand Key GState
 
 data GState = GState
   { gs_position :: V2 Double,

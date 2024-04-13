@@ -2,6 +2,7 @@
 
 module Game where
 
+import Control.Monad
 import Control.Lens
 import Data.Generics.Labels ()
 import Data.Map qualified as M
@@ -10,15 +11,25 @@ import Drawing
 import FRP.Yampa hiding ((*^))
 import GHC.Generics
 import Router
-import SDL hiding (Stereo, Vector, copy)
+import SDL hiding (Event, Stereo, Vector, copy)
 import Types
+import Data.Maybe (maybeToList)
 
 game :: SF FrameInfo Renderable
 game =
   fmap (foldMap oo_render) $
-    router (maybe 0 (+ 1) . fmap fst . M.lookupMax) (\_ _ -> mempty) $
-      ObjectMap mempty $
-        M.singleton 0 (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 100}, ourDude)
+    router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
+      ObjectMap mempty $ M.fromList $
+        [ (0, (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude))
+        , (1, (GState {gs_position = 300, gs_color = V4 255 0 0 255, gs_size = 30}, head
+               $ makeSpells
+               $ Explosion undefined
+               $ Just
+               $ Explosion undefined
+               $ Just
+               $ Explosion undefined Nothing
+          ))
+        ]
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -98,3 +109,47 @@ renderGState gs =
   drawFilledRect (gs_color gs) $
     Rectangle (P (gs_position gs)) $
       gs_size gs
+
+
+withLifetime :: Time -> SF a (Double, Event (), [Command msg c k s])
+withLifetime ttl = proc _ -> do
+  t <- localTime -< ()
+  e <- delayEvent ttl <<< now () -< ()
+  returnA -< (t / ttl, e, onEvent' e Unspawn)
+
+
+spellTtl :: Double
+spellTtl = 0.5
+
+
+onEvent :: (Applicative f, Monoid (f b)) => Event a -> (a -> b) -> f b
+onEvent ev f = foldMap (pure . f) ev
+
+onEvent' :: (Applicative f, Monoid (f b)) => Event a -> b -> f b
+onEvent' ev = onEvent ev . const
+
+
+makeSpells :: Spell -> [Dude]
+makeSpells (Standard _) = []
+makeSpells (Projectile _ _) = undefined
+makeSpells (Explosion _ k) = pure $ proc oi -> do
+  (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
+  let st = oi_state oi
+         & #gs_size .~ perc *^ 100
+         & #gs_color .~ V4 255 0 255 128
+  returnA -<
+    ObjectOutput
+      { oo_outbox = mempty
+      , oo_commands = mconcat
+          [ die_cmds
+          , join $ onEvent' on_die $ do
+              spell <- maybeToList k
+              dude <- makeSpells spell
+              pure $ Spawn Nothing st dude
+          ]
+      , oo_render = renderGState st
+      , oo_state = st
+      }
+makeSpells (Concurrent x y) = makeSpells x <> makeSpells y
+
+
