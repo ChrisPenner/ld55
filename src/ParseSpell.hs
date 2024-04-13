@@ -40,10 +40,3 @@ parseSpell finisher = \case
   RuneAndThen : rs -> parseSpell finisher rs
   RuneNegate : rs -> negateSpell $ parseSpell finisher rs
 
--- data AttackRune
---   = AttackProjectile
---   | AttackExplosion
-
--- data ModRune = Mod2x | ModNegate
-
--- type RunesWithModifiers = [((Payload -> Payload), AttackRune)]
