@@ -18,6 +18,7 @@ import Types
 
 game :: SF FrameInfo Renderable
 game =
+  fmap (<> drawText 16 (V3 0 0 0) "yo what up" 30) $
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
       ObjectMap mempty $ M.fromList $

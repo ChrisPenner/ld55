@@ -14,6 +14,7 @@ import FRP.Yampa hiding ((*^))
 import SDL hiding (Stereo, Vector, copy)
 import System.Exit
 import Types
+import Resources (loadResources)
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -51,10 +52,13 @@ main = do
   rendererDrawBlendMode renderer $= BlendAlphaBlend
   cursorVisible $= False
 
+  resources <- loadResources renderer
+
   let engine =
         Engine
           { e_renderer = renderer,
             e_window = window
+          , e_resources = resources
           }
 
   tS <- getSystemTime

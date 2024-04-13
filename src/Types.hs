@@ -35,6 +35,7 @@ type Renderable = Engine -> IO ()
 data Engine = Engine
   { e_renderer :: Renderer,
     e_window :: Window
+  , e_resources :: Resources
   }
 
 data Controller = Controller
@@ -193,3 +194,9 @@ data Rune
 
 data Finisher = Attack | Defend | Move
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
+
+data Resources = Resources
+  { r_font :: Char -> Texture
+  }
+  deriving stock (Generic)
