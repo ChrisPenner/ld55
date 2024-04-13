@@ -262,7 +262,7 @@ runeInput pos gt = proc ev -> do
     ( on_use
     , mconcat
         [ drawGameTextureOriginRect gt ore pos 0 (pure False)
-        , drawOriginRect (V4 0 0 0 (round $ perc_available * 255)) ore pos
+        , drawOriginRect (V4 0 0 0 (round $ if perc_available == 0 then 0 else max 92 (perc_available * 255))) ore pos
         , if want_halo
               then drawOriginRect (V4 255 255 0 64) ore pos
               else mempty
