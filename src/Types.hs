@@ -1,32 +1,31 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Types
-  ( module Types
-  , Y.Time
-  , Y.SF
-  , Y.Event
-  , Generic
-  , module Data.Kind
-  , module Data.Typeable
-  , Map
-  , traceShowId
+  ( module Types,
+    Y.Time,
+    Y.SF,
+    Y.Event,
+    Generic,
+    module Data.Kind,
+    module Data.Typeable,
+    Map,
+    traceShowId,
   )
-  where
+where
 
-import Debug.Trace (traceShowId)
-import Data.Monoid
 import Data.Generics.Labels ()
+import Data.Kind
+import Data.Map (Map)
+import Data.Map qualified as M
+import Data.Maybe
+import Data.Monoid
+import Data.Typeable
 import Data.Word
-import FRP.Yampa qualified as Y
+import Debug.Trace (traceShowId)
 import FRP.Yampa (SF)
+import FRP.Yampa qualified as Y
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
-import Data.Kind
-import Data.Typeable
-import Data.Maybe
-import qualified Data.Map as M
-import Data.Map (Map)
-
 
 type Color = V4 Word8
 
@@ -58,9 +57,6 @@ data FrameInfo = FrameInfo
   }
   deriving stock (Generic)
 
-
-
-
 type SomeMsg :: (Type -> Type) -> Type
 data SomeMsg msg where
   SomeMsg :: Typeable t => msg t -> t -> SomeMsg msg
@@ -77,20 +73,26 @@ instance Show Renderable where
 instance Show (SF i o) where
   show _ = "<SF>"
 
-
 type ObjectMap :: (Type -> Type) -> Type -> Type -> Type -> Type
 data ObjectMap msg k s a = ObjectMap
-  { objm_undeliveredMsgs :: Map k [(k, SomeMsg msg)]
-  , objm_map :: Map k (s, a)
+  { objm_undeliveredMsgs :: Map k [(k, SomeMsg msg)],
+    objm_map :: Map k (s, a)
   }
   deriving stock (Functor, Generic, Foldable)
 
-data Message a where
+data Message a
   deriving stock (Eq, Ord, Show, Read, Generic)
 
 type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
-type Dude = ObjSF Proxy () Int ()
+type Dude = ObjSF Proxy () Int GState
+
+data GState = GState
+  { gs_position :: V2 Double,
+    gs_size :: V2 Double,
+    gs_color :: V4 Word8
+  }
+  deriving stock (Generic)
 
 data Command msg c k s
   = Unspawn
@@ -118,10 +120,10 @@ instance Monoid (ObjectInEvents msg k) where
 
 type ObjectInput :: (Type -> Type) -> Type -> Type -> Type
 data ObjectInput msg k s = ObjectInput
-  { oi_fi       :: FrameInfo
-  , oi_self     :: k
-  , oi_everyone :: Map k s
-  , oi_inbox    :: ObjectInEvents msg k
+  { oi_fi :: FrameInfo,
+    oi_self :: k,
+    oi_everyone :: Map k s,
+    oi_inbox :: ObjectInEvents msg k
   }
 
 oi_state :: Ord k => ObjectInput msg k s -> s
@@ -129,10 +131,10 @@ oi_state oi = fromMaybe (error "uh oh; no state!") $ M.lookup (oi_self oi) $ oi_
 
 type ObjectOutput :: (Type -> Type) -> Type -> Type -> Type -> Type
 data ObjectOutput msg c k s = ObjectOutput
-  { oo_outbox   :: [(k, SomeMsg msg)]
-  , oo_commands :: [Command msg c k s]
-  , oo_render   :: Renderable
-  , oo_state    :: s
+  { oo_outbox :: [(k, SomeMsg msg)],
+    oo_commands :: [Command msg c k s],
+    oo_render :: Renderable,
+    oo_state :: s
   }
   deriving stock (Generic)
 
@@ -147,5 +149,5 @@ instance Semigroup s => Semigroup (ObjectOutput msg c k s) where
       (a4 <> b4)
 
 deriving via (Ap Y.Event a) instance Semigroup a => Semigroup (Y.Event a)
-deriving via (Ap Y.Event a) instance Monoid a => Monoid (Y.Event a)
 
+deriving via (Ap Y.Event a) instance Monoid a => Monoid (Y.Event a)
