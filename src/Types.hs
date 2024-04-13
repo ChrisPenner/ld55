@@ -105,6 +105,7 @@ data DamageSrc = DamageSrc
 
 data GameMsg t where
   DamageSource :: GameMsg DamageSrc
+  YouHitMe :: GameMsg ()
   Teleport :: GameMsg (V2 Double)
 
 deriving stock instance Eq (GameMsg t)
@@ -152,10 +153,10 @@ instance Monoid (ObjectInEvents msg k) where
 
 type ObjectInput :: (Type -> Type) -> Type -> Type -> Type
 data ObjectInput msg k s = ObjectInput
-  { oi_fi :: FrameInfo,
-    oi_self :: k,
-    oi_everyone :: Map k s,
-    oi_inbox :: ObjectInEvents msg k
+  { oi_fi :: FrameInfo
+  , oi_self :: k
+  , oi_everyone :: Map k s
+  , oi_inbox :: ObjectInEvents msg k
   }
   deriving stock (Generic)
 
@@ -272,14 +273,6 @@ data OriginRect aff = OriginRect
     orect_offset :: V2 aff
   }
   deriving (Eq, Ord, Show, Functor, Generic)
-
-orTopLeft :: Num a => V2 a -> OriginRect a -> V2 a
-orTopLeft pos ore = pos - orect_offset ore
-
-originRectToRect :: Num a => OriginRect a -> V2 a -> Rectangle a
-originRectToRect ore pos =
-  Rectangle (P $ orTopLeft pos ore) $
-    orect_size ore
 
 wrappedToOriginRect :: WrappedTexture -> OriginRect Double
 wrappedToOriginRect wt =

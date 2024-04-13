@@ -5,12 +5,15 @@
 
 module Game where
 
+import Debug.Trace (trace)
+import qualified Data.Set as S
+import Data.Set (Set)
 import Control.Applicative
 import Control.Lens
 import Control.Monad
 import Data.Generics.Labels ()
 import Data.Map qualified as M
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, listToMaybe)
 import Data.Monoid
 import Data.Ord (clamp)
 import Drawing
@@ -18,9 +21,10 @@ import FRP.Yampa hiding (dot, normalize, (*^))
 import GHC.Generics hiding (to)
 import ParseSpell (parseSpell)
 import Router
-import SDL hiding (Event, Stereo, Vector, copy, delay)
+import SDL hiding (Event, Stereo, Vector, copy, delay, trace)
 import Types
 import Prelude hiding (last)
+import Geometry
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -155,6 +159,14 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
       (Left RuneAndThen) -< c
 
   let dmgsources = oie_mailbox (oi_inbox oi) DamageSource
+      hit_me = do
+        let my_rect = originRectToRect hitbox $ gs_position $ oi_state oi
+        dsrc@(_, DamageSrc{..}) <- dmgsources
+        guard $ ds_originator /= oi_self oi
+        guard $ intersects my_rect $ originRectToRect ds_ore ds_pos
+        pure dsrc
+
+  kept <- maintain 5 -< maybeToEvent $ listToMaybe $ fmap fst hit_me
 
   shoot <- edge -< c_okButton c
 
@@ -219,7 +231,7 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
            strlen = fromIntegral $ length str
         in
       ( ObjectOutput
-          { oo_outbox = mempty
+          { oo_outbox = fmap (second $ const $ SomeMsg YouHitMe ()) hit_me
           , oo_commands = commands
           , oo_render = mconcat
               [ sprite
@@ -228,9 +240,13 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
                       stride = 20
                       offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
                   (i, rt) <- zip [id @Int 0..] pendingRunes
-                  let ore = mkGroundOriginRect $ V2 17 25
+                  let rune_ore = mkGroundOriginRect $ V2 17 25
                   pure
-                    $ drawGameTextureOriginRect (runeTexture rt) ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
+                    $ drawGameTextureOriginRect
+                        (runeTexture rt)
+                        rune_ore
+                        (pos + V2 (fromIntegral i * stride - offset) (-64))
+                        0
                     $ pure False
               , draw_runes
               , mconcat $ do
@@ -243,9 +259,13 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
               ]
           , oo_state = newState
           }
-      , pstate & #ps_pendingRunes
-          %~ \pendingRunes -> event id (const $ const []) shoot pendingRunes <> new_runes
+      , pstate
+          & #ps_health -~ sum (fmap (ds_damage . snd) hit_me)
+          & #ps_pendingRunes %~ \pendingRunes ->
+              event id (const $ const []) shoot pendingRunes <> new_runes
       )
+  where
+    hitbox = mkGroundOriginRect $ V2 17 38
 
 renderGState :: GState -> Renderable
 renderGState gs =
@@ -313,7 +333,7 @@ makeSpells playerKey dir  =
               { oo_outbox = outBox
               , oo_commands = Broadcast (SomeMsg DamageSource
                       ( DamageSrc
-                        { ds_originator = Other 0
+                        { ds_originator = playerKey
                         , ds_damage = 20
                         , ds_pos = gs_position st
                         , ds_ore = mkCenterdOriginRect $ gs_size st
@@ -392,6 +412,17 @@ runeInput pos gt = proc ev -> do
               else mempty
           ]
       )
+
+
+maintain :: Ord a => Time -> SF (Event a) (Set a)
+maintain t = loopPre mempty $ proc (ev, kept) -> do
+  (_, add_ev, _) <- cooldown t -< ev
+  remove_ev <- delayEvent t -< add_ev
+  let actions = mconcat
+        [ foldMap S.insert add_ev
+        , foldMap S.delete remove_ev
+        ]
+  returnA -< dup $ actions kept
 
 
 runeTexture :: Rune -> GameTexture
