@@ -151,3 +151,7 @@ instance Semigroup s => Semigroup (ObjectOutput msg c k s) where
 deriving via (Ap Y.Event a) instance Semigroup a => Semigroup (Y.Event a)
 
 deriving via (Ap Y.Event a) instance Monoid a => Monoid (Y.Event a)
+
+deriving stock instance Foldable Y.Event
+
+deriving stock instance Traversable Y.Event

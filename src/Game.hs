@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module Game where
 
 import Control.Lens
@@ -57,12 +59,18 @@ fireBall velocity = proc oi -> do
 ourDude :: Dude
 ourDude = proc oi -> do
   dPos <- playerLogic -< fi_controls $ oi_fi oi
+  okPressed <- edge -< c_okButton . fi_controls $ oi_fi oi
+  let commands =
+        okPressed & foldMap \() ->
+          [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (V2 100 0)
+          ]
+
   let newState = oi_state oi & #gs_position +~ dPos
   returnA
     -<
       ObjectOutput
         { oo_outbox = mempty,
-          oo_commands = mempty,
+          oo_commands = commands,
           oo_render = renderGState newState,
           oo_state = newState
         }
