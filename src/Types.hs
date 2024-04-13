@@ -95,10 +95,19 @@ data Message a
 
 type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
-data GameMsg k where
+data DamageSrc = DamageSrc
+  { ds_originator :: Key
+  , ds_damage :: Int
+  , ds_pos :: V2 Double
+  , ds_ore :: OriginRect Double
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+
+data GameMsg t where
+  DamageSource :: GameMsg DamageSrc
   Teleport :: GameMsg (V2 Double)
 
-deriving stock instance Eq (GameMsg k)
+deriving stock instance Eq (GameMsg t)
 
 data GameCommand
   deriving (Eq, Ord, Show, Generic)

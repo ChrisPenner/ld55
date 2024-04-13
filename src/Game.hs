@@ -1,6 +1,7 @@
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BlockArguments            #-}
+{-# LANGUAGE MultiWayIf                #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE RecordWildCards            #-}
 
 module Game where
 
@@ -12,7 +13,6 @@ import Data.Map qualified as M
 import Data.Maybe (maybeToList)
 import Data.Monoid
 import Data.Ord (clamp)
-import Data.Word
 import Drawing
 import FRP.Yampa hiding (dot, normalize, (*^))
 import GHC.Generics hiding (to)
@@ -72,13 +72,6 @@ playerLogic = proc c -> do
   where
     playerSpeed :: V2 Double
     playerSpeed = 100
-
-data FireballState = FireballState
-  { fs_position :: V2 Double,
-    fs_velocity :: V2 Double,
-    fs_color :: V4 Word8
-  }
-  deriving stock (Eq, Ord, Show, Generic)
 
 fireBall :: V2 Double -> Dude
 fireBall velocity = proc oi -> do
@@ -141,9 +134,15 @@ runRuneSet pos cty r1 r2 r3 r4 = proc c -> do
       Gamepad -> V2 0 (-ydist)
       Keyboard -> V2 150 0
 
+data PlayerState = PlayerState
+  { ps_pendingRunes :: [Rune]
+  , ps_health :: Int
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+
 
 ourDude :: Int -> ControllerType -> Dude
-ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
+ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
   let c = (!! ctrlix) $ fi_controls $ oi_fi oi
   let selfKey = oi_self oi
   dPos <- playerLogic -< c
@@ -155,6 +154,8 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
       (Right RuneProjectile)
       (Right RuneExplosion)
       (Left RuneAndThen) -< c
+
+  let dmgsources = oie_mailbox (oi_inbox oi) DamageSource
 
   shoot <- edge -< c_okButton c
 
@@ -186,7 +187,7 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
             )
             $ maybe []
                 (makeSpells selfKey (dirFacing * 300))
-                $ parseSpell Move pendingRunes
+                $ parseSpell Move $ ps_pendingRunes pstate
   let getLetters =  oi ^. #oi_inbox . to oie_mailbox
   let mayTeleportTo = (getLetters Teleport ^? _head) <&> snd
   let newState = oi_state oi
@@ -194,6 +195,7 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
                    & \s -> case mayTeleportTo of
                              Just p -> s & #gs_position .~ p
                              Nothing -> s
+
       pos = gs_position newState
 
       anim =
@@ -219,7 +221,8 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
           , oo_render = mconcat
               [ sprite
               , mconcat $ do
-                  let stride = 20
+                  let pendingRunes = ps_pendingRunes pstate
+                      stride = 20
                       offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
                   (i, rt) <- zip [id @Int 0..] pendingRunes
                   let ore = mkGroundOriginRect $ V2 17 25
@@ -227,11 +230,14 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
                     $ drawGameTextureOriginRect (runeTexture rt) ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
                     $ pure False
               , draw_runes
+              , mconcat $ do
+                  (_, DamageSrc{..}) <- dmgsources
+                  pure $ drawOriginRect (V4 255 0 0 128) ds_ore ds_pos
               ]
           , oo_state = newState
           }
-      , event id (const $ const []) shoot $ pendingRunes
-          <> new_runes
+      , pstate & #ps_pendingRunes
+          %~ \pendingRunes -> event id (const $ const []) shoot pendingRunes <> new_runes
       )
 
 renderGState :: GState -> Renderable
@@ -297,10 +303,18 @@ makeSpells playerKey dir  =
         returnA
           -<
             ObjectOutput
-              { oo_outbox = outBox,
-                oo_commands = cmds,
-                oo_render = renderGState st,
-                oo_state = st
+              { oo_outbox = outBox
+              , oo_commands = Broadcast (SomeMsg DamageSource
+                      ( DamageSrc
+                        { ds_originator = Other 0
+                        , ds_damage = 20
+                        , ds_pos = gs_position st
+                        , ds_ore = mkCenterdOriginRect $ gs_size st
+                        }
+                      ))
+                  : cmds
+              , oo_render = renderGState st
+              , oo_state = st
               }
     (Explosion _ k) ->
       pure $ proc oi -> do
@@ -321,6 +335,7 @@ makeSpells playerKey dir  =
       makeSpells playerKey (mkRotMatrix (pi / 10) !* dir) x
         <> makeSpells playerKey (mkRotMatrix (-pi / 10) !* dir) y
 
+
 mkRotMatrix :: Double -> M22 Double
 mkRotMatrix theta =
   V2
@@ -338,6 +353,7 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
   next_ok <- edge -< next_ok_at <= t
   returnA -< ((clamp (0, 1) ((next_ok_at - t) / wait), gated_ev, next_ok), next_ok_at)
 
+
 runeInput :: V2 Double -> Rune -> SF (Event a) (Event Rune, Renderable)
 runeInput pos gt = proc ev -> do
   (perc_available, on_use, on_refresh) <- cooldown 1.5 -< ev
@@ -351,22 +367,27 @@ runeInput pos gt = proc ev -> do
           ]
 
   let ore = mkCenterdOriginRect $ V2 35 50
-
   returnA
     -<
       ( gt <$ on_use,
         mconcat
-          [ drawGameTextureOriginRect (runeTexture gt) ore pos 0 (pure False),
-            drawOriginRect (V4 0 0 0 (round $ if perc_available == 0 then 0 else max 92 (perc_available * 255))) ore pos,
-            if want_halo
+          [ drawGameTextureOriginRect (runeTexture gt) ore pos 0 (pure False)
+          , drawOriginRect
+                (V4 0 0 0
+                  $ round
+                  $ if perc_available == 0
+                        then 0
+                        else max 92 $ perc_available * 255
+                ) ore pos
+          , if want_halo
               then drawOriginRect (V4 255 255 0 64) ore pos
               else mempty
           ]
       )
+
 
 runeTexture :: Rune -> GameTexture
 runeTexture (Left Rune2x) = Texture_UnoPlusTwo
 runeTexture (Right RuneProjectile) = Texture_UnoWild
 runeTexture (Right RuneExplosion) = Texture_UnoReverse
 runeTexture (Left RuneAndThen) = Texture_UnoSkip
--- runeTexture _ = Texture_Rune1
