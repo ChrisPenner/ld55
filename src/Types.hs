@@ -284,3 +284,7 @@ mkGroundOriginRect sz@(V2 x y) = OriginRect sz $ V2 (x / 2) y
 onChange :: Eq a => SF a (Y.Event a)
 onChange = proc a ->
   Y.edgeBy (\old new -> bool Nothing new $ old /= new) Nothing -< Just a
+
+
+data ControllerType = Keyboard | Gamepad
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)

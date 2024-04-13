@@ -35,21 +35,18 @@ screenSize = V2 (h * aspectRatio) h
 
 game :: Int -> SF FrameInfo Renderable
 game num_players =
-  fmap
-    ( \z ->
-        mconcat
-          [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False,
-            z,
-            drawText 16 (V3 0 0 0) "yo what up" 30
-          ]
-    )
-    $ fmap (foldMap oo_render)
-    $ router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty
-    $ ObjectMap mempty
-    $ M.fromList
-    $ do
-      i <- [0 .. num_players - 1]
-      pure $ (i, (GState {gs_position = 200 + V2 (fromIntegral i * 200) 0, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i))
+  fmap (\z ->
+    mconcat
+     [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False
+     , z
+     , drawText 16 (V3 0 0 0) "yo what up" 30
+     ]
+       ) $
+  fmap (foldMap oo_render) $
+    router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
+      ObjectMap mempty $ M.fromList $ do
+        (i, cty) <- zip [0 .. num_players - 1] $ Keyboard : repeat Gamepad
+        pure $ (i, (GState {gs_position = 200 + V2 (fromIntegral i * 200) 0, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i cty))
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -93,14 +90,52 @@ fireBall velocity = proc oi -> do
   where
     ttl = 2
 
-ourDude :: Int -> Dude
-ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
-  let c = (!! controller) $ fi_controls $ oi_fi oi
+
+runRuneSet :: V2 Double -> ControllerType -> Rune -> Rune -> Rune -> Rune -> SF Controller (Renderable, [Rune])
+runRuneSet pos cty r1 r2 r3 r4 = proc c -> do
+  (r1_ev, draw_rune1) <- runeInput (pos + r1pos) r1 <<< edge -< c_zButton c
+  (r2_ev, draw_rune2) <- runeInput (pos + r2pos) r2 <<< edge -< c_xButton c
+  (r3_ev, draw_rune3) <- runeInput (pos + r3pos) r3 <<< edge -< c_cButton c
+  (r4_ev, draw_rune4) <- runeInput (pos + r4pos) r4 <<< edge -< c_vButton c
+  returnA -<
+    ( mconcat
+        [ draw_rune1
+        , draw_rune2
+        , draw_rune3
+        , draw_rune4
+        ]
+    , onEvent r1_ev id
+      <> onEvent r2_ev id
+      <> onEvent r3_ev id
+      <> onEvent r4_ev id
+    )
+      where
+  xdist = 40
+  ydist = 30
+  r1pos =
+    case cty of
+      Gamepad -> V2 0 ydist
+      Keyboard -> V2 0 0
+  r2pos =
+    case cty of
+      Gamepad -> V2 xdist 0
+      Keyboard -> V2 50 0
+  r3pos =
+    case cty of
+      Gamepad -> V2 (-xdist) 0
+      Keyboard -> V2 100 0
+  r4pos =
+    case cty of
+      Gamepad -> V2 0 (-ydist)
+      Keyboard -> V2 150 0
+
+
+ourDude :: Int -> ControllerType -> Dude
+ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
+  let c = (!! ctrlix) $ fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (r1, draw_rune1) <- runeInput (V2 (fromIntegral controller * 300 + 100) 500) (Left Rune2x) <<< edge -< c_zButton c
-  (r2, draw_rune2) <- runeInput (V2 (fromIntegral controller * 300 + 150) 500) (Right RuneProjectile) <<< edge -< c_xButton c
-  (r3, draw_rune3) <- runeInput (V2 (fromIntegral controller * 300 + 200) 500) (Right RuneExplosion) <<< edge -< c_cButton c
-  (r4, draw_rune4) <- runeInput (V2 (fromIntegral controller * 300 + 250) 500) (Left RuneAndThen) <<< edge -< c_vButton c
+  (draw_runes, new_runes) <-
+    runRuneSet (V2 100 450 + V2 (fromIntegral ctrlix * 300) 0) cty (Left Rune2x) (Right RuneProjectile) (Right RuneExplosion) (Left RuneAndThen) -< c
 
   shoot <- edge -< c_okButton c
 
@@ -155,32 +190,24 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
   returnA
     -<
       ( ObjectOutput
-          { oo_outbox = mempty,
-            oo_commands = commands,
-            oo_render =
-              mconcat
-                [ sprite,
-                  mconcat $ do
-                    let stride = 20
-                        offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
-                    (i, rt) <- zip [id @Int 0 ..] pendingRunes
-                    let ore = mkGroundOriginRect $ V2 17 25
-                    pure $
-                      drawGameTextureOriginRect (runeTexture rt) ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0 $
-                        pure False,
-                  draw_rune1,
-                  draw_rune2,
-                  draw_rune3,
-                  draw_rune4
-                ],
-            oo_state = newState
-          },
-        event id (const $ const []) shoot $
-          pendingRunes
-            <> onEvent r1 id
-            <> onEvent r2 id
-            <> onEvent r3 id
-            <> onEvent r4 id
+          { oo_outbox = mempty
+          , oo_commands = commands
+          , oo_render = mconcat
+              [ sprite
+              , mconcat $ do
+                  let stride = 20
+                      offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
+                  (i, rt) <- zip [id @Int 0..] pendingRunes
+                  let ore = mkGroundOriginRect $ V2 17 25
+                  pure
+                    $ drawGameTextureOriginRect (runeTexture rt) ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
+                    $ pure False
+              , draw_runes
+              ]
+          , oo_state = newState
+          }
+      , event id (const $ const []) shoot $ pendingRunes
+          <> new_runes
       )
 
 renderGState :: GState -> Renderable
