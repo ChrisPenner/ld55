@@ -28,6 +28,7 @@ import FRP.Yampa qualified as Y
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
 import Foreign.C
+import Data.Bool (bool)
 
 type Color = V4 Word8
 
@@ -206,8 +207,12 @@ data Finisher = Attack | Defend | Move
 data Resources = Resources
   { r_font :: Char -> Texture
   , r_textures :: GameTexture -> WrappedTexture
+  , r_spritesheet :: LpcGuy -> WrappedTexture
   }
   deriving stock (Generic)
+
+data LpcGuy = Wizard
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
 data WrappedTexture = WrappedTexture
   { getTexture    :: Texture
@@ -230,7 +235,24 @@ data GameTexture
   | Texture_UnoPlusTwo
   | Texture_UnoWild
   | Texture_Background
-  deriving stock (Eq, Ord, Show, Enum, Bounded)
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
+
+data Dir = DirUp | DirLeft | DirDown | DirRight
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
+data AnimName = SpellCast | Thrust | Walk | Slash | Shoot | Die
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
+data Anim = LpcAnim Dir AnimName
+  deriving stock (Eq, Ord, Show, Generic)
+
+data DrawSpriteDetails = DrawSpriteDetails
+  { dsd_anim :: Anim
+  , dsd_rotation :: Double
+  , dsd_flips :: V2 Bool
+  }
+  deriving stock (Eq, Ord, Show, Generic)
 
 
 
@@ -263,3 +285,7 @@ mkCenterdOriginRect sz = OriginRect sz (sz / 2)
 
 mkGroundOriginRect :: Fractional a => V2 a -> OriginRect a
 mkGroundOriginRect sz@(V2 x y) = OriginRect sz $ V2 (x / 2) y
+
+onChange :: Eq a => SF a (Y.Event a)
+onChange = proc a ->
+  Y.edgeBy (\old new -> bool Nothing new $ old /= new) Nothing -< Just a

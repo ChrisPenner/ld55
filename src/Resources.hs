@@ -34,9 +34,15 @@ loadResources renderer = do
     wt <- wrapTexture t
     pure (gt, wt)
 
+  spritemap <- fmap M.fromList $ for [minBound .. maxBound] $ \gt -> do
+    t <- loadJuicyTexture renderer $ rpath </> "sprites" </> show gt <.> "png"
+    wt <- wrapTexture t
+    pure (gt, wt)
+
   pure $ Resources
     { r_font = (fontmap M.!)
     , r_textures = (texmap M.!)
+    , r_spritesheet = (spritemap M.!)
     }
 
 textureName :: GameTexture -> String

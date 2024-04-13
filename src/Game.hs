@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments            #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Game where
 
@@ -10,7 +11,7 @@ import Data.Map qualified as M
 import Data.Maybe (maybeToList)
 import Data.Word
 import Drawing
-import FRP.Yampa hiding (normalize, (*^))
+import FRP.Yampa hiding (dot, normalize, (*^))
 import GHC.Generics
 import ParseSpell (parseSpell)
 import Router
@@ -111,7 +112,9 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
 
   shoot <- edge -< c_okButton c
 
-  dirFacing <-
+  let vel = oi ^. #oi_fi . #fi_controls . #c_leftStick
+
+  dirFacing <- fmap normalize $
     hold (V2 1 0)
       <<< edgeBy
         ( \_ vel ->
@@ -120,8 +123,8 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
               else Nothing
         )
         0
-      -<
-        oi ^. #oi_fi . #fi_controls . #c_leftStick
+      -< vel
+
 
   let commands =
         shoot & foldMap \() ->
@@ -138,13 +141,29 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
 
   let newState = oi_state oi & #gs_position +~ dPos
       pos = gs_position newState
+
+      anim =
+        case vel == 0 of
+          True -> Slash
+          False -> Walk
+
+      dir = if
+              | dot dirFacing (V2 (-1) 0) > 0.7 -> DirLeft
+              | dot dirFacing (V2 1 0) > 0.7 -> DirRight
+              | dot dirFacing (V2 0 1) > 0.7 -> DirDown
+              | dot dirFacing (V2 0 (-1)) > 0.7 -> DirUp
+              | otherwise -> DirDown
+
+
+  sprite <- mkAnim Wizard -< (DrawSpriteDetails (LpcAnim dir anim) 0 $ pure False, pos)
+
   returnA
     -<
       ( ObjectOutput
           { oo_outbox = mempty
           , oo_commands = commands
           , oo_render = mconcat
-              [ renderGState newState
+              [ sprite
               , mconcat $ do
                   let stride = 20
                       offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
