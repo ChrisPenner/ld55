@@ -87,9 +87,11 @@ parseControls isKeyDown =
                 | isKeyDown ScancodeS -> 1
                 | otherwise -> 0
           )
-          & SDL.normalize,
-      c_okButton = isKeyDown ScancodeZ,
-      c_cancelButton = isKeyDown ScancodeX
+          & SDL.normalize
+    , c_okButton = isKeyDown ScancodeZ
+    , c_cancelButton = isKeyDown ScancodeX
+    , c_cButton = isKeyDown ScancodeC
+    , c_vButton = isKeyDown ScancodeV
     }
 
 input :: Engine -> IORef Double -> Maybe Joystick -> Bool -> IO (Double, Maybe FrameInfo)

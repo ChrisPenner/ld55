@@ -90,8 +90,10 @@ ourDude :: Dude
 ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (okPressed, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_okButton c
-  (cancelPressed, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_cancelButton c
+  (r1, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_okButton c
+  (r2, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_cancelButton c
+  (r3, draw_rune3) <- runeInput (V2 200 500) Texture_UnoSkip <<< edge -< c_cButton c
+  (r4, draw_rune4) <- runeInput (V2 250 500) Texture_UnoPlusTwo <<< edge -< c_vButton c
 
   dirFacing <-
     hold (V2 1 0)
@@ -105,10 +107,10 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
       -<
         oi ^. #oi_fi . #fi_controls . #c_leftStick
 
-  let commands =
-        okPressed & foldMap \() ->
-          [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (dirFacing * 100)
-          ]
+--   let commands =
+--         okPressed & foldMap \() ->
+--           [ Spawn Nothing (GState {gs_position = gs_position $ oi_state oi, gs_color = V4 0 255 0 254, gs_size = 20}) $ fireBall (dirFacing * 100)
+--           ]
 
   let newState = oi_state oi & #gs_position +~ dPos
       pos = gs_position newState
@@ -116,7 +118,7 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
     -<
       ( ObjectOutput
           { oo_outbox = mempty
-          , oo_commands = commands
+          , oo_commands = mempty -- commands
           , oo_render = mconcat
               [ renderGState newState
               , mconcat $ do
@@ -125,12 +127,16 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
                   pure $ drawGameTextureOriginRect rt ore (pos + V2 (i * 20) (-30)) 0 (pure False)
               , draw_rune1
               , draw_rune2
+              , draw_rune3
+              , draw_rune4
               ]
           , oo_state = newState
           }
       , pendingRunes
-          <> onEvent' okPressed     Texture_UnoSkip
-          <> onEvent' cancelPressed Texture_UnoWild
+          <> onEvent' r1 Texture_UnoSkip
+          <> onEvent' r2 Texture_UnoWild
+          <> onEvent' r3 Texture_UnoSkip
+          <> onEvent' r4 Texture_UnoPlusTwo
       )
 
 renderGState :: GState -> Renderable
@@ -230,7 +236,7 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
 
 runeInput :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
 runeInput pos gt = proc ev -> do
-  (perc_available, on_use, on_refresh) <- cooldown 2 -< ev
+  (perc_available, on_use, on_refresh) <- cooldown 3 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
   want_halo <- fmap getAny $ hold (Any False) -< asum
     [ Any True  <$ on_refresh
