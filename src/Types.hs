@@ -101,7 +101,10 @@ data GameMsg k
 data GameCommand
   deriving (Eq, Ord, Show, Generic)
 
-type Key = Int
+data Key
+  = Player Int
+  | Other Int
+  deriving (Eq, Ord, Show)
 
 type Dude = ObjSF GameMsg GameCommand Key GState
 

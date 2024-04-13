@@ -43,10 +43,22 @@ game num_players =
      ]
        ) $
   fmap (foldMap oo_render) $
-    router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
+    router (maybe (Other 0)
+                  (\case
+                    Player n -> Other 0
+                    Other n -> Other $ n + 1
+                  )
+                  . fmap fst . M.lookupMax) mempty $
       ObjectMap mempty $ M.fromList $ do
         (i, cty) <- zip [0 .. num_players - 1] $ Keyboard : repeat Gamepad
-        pure $ (i, (GState {gs_position = 200 + V2 (fromIntegral i * 200) 0, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i cty))
+        pure $ (Player i,
+          ( GState
+              { gs_position = 200 + V2 (fromIntegral i * 200) 0
+              , gs_color = V4 255 0 0 255
+              , gs_size = 15
+              }
+          , ourDude i cty
+          ))
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -167,7 +179,7 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
             )
             $ maybe []
                 (makeSpells (dirFacing * 300))
-                (traceShowId $ parseSpell Attack $ traceShowId $ pendingRunes)
+                $ parseSpell Attack pendingRunes
 
   let newState = oi_state oi & #gs_position +~ dPos
       pos = gs_position newState
