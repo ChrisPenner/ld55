@@ -90,6 +90,8 @@ data Message a where
 
 type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
+type Dude = ObjSF Proxy () Int ()
+
 data Command msg c k s
   = Unspawn
   | Spawn (Maybe k) s (ObjSF msg c k s)
