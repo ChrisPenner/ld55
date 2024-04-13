@@ -159,14 +159,19 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
       (Left RuneAndThen) -< c
 
   let dmgsources = oie_mailbox (oi_inbox oi) DamageSource
-      hit_me = do
+      hitting_me = do
         let my_rect = originRectToRect hitbox $ gs_position $ oi_state oi
         dsrc@(_, DamageSrc{..}) <- dmgsources
         guard $ ds_originator /= oi_self oi
         guard $ intersects my_rect $ originRectToRect ds_ore ds_pos
         pure dsrc
 
-  kept <- maintain 5 -< maybeToEvent $ listToMaybe $ fmap fst hit_me
+  kept <- maintain 0.5 -<
+    case hitting_me of
+      [] -> noEvent
+      xs -> Event $ S.fromList xs
+
+  let hit_me = filter (flip S.member kept) hitting_me
 
   shoot <- edge -< c_okButton c
 
@@ -198,7 +203,7 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
             )
             $ maybe []
                 (makeSpells selfKey (dirFacing * 300))
-                $ parseSpell Move $ ps_pendingRunes pstate
+                $ parseSpell Attack $ ps_pendingRunes pstate
   let getLetters =  oi ^. #oi_inbox . to oie_mailbox
   let mayTeleportTo = (getLetters Teleport ^? _head) <&> snd
   let newState = oi_state oi
@@ -384,7 +389,7 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
 
 runeInput :: V2 Double -> Rune -> SF (Event a) (Event Rune, Renderable)
 runeInput pos gt = proc ev -> do
-  (perc_available, on_use, on_refresh) <- cooldown 1.5 -< ev
+  (perc_available, on_use, on_refresh) <- cooldown 0.1 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
   want_halo <-
     fmap getAny $ hold (Any False)
@@ -414,15 +419,15 @@ runeInput pos gt = proc ev -> do
       )
 
 
-maintain :: Ord a => Time -> SF (Event a) (Set a)
+maintain :: Ord a => Time -> SF (Event (Set a)) (Set a)
 maintain t = loopPre mempty $ proc (ev, kept) -> do
-  (_, add_ev, _) <- cooldown t -< ev
+  (_, add_ev, _) <- cooldown t -< fmap (S.\\ kept) ev
   remove_ev <- delayEvent t -< add_ev
-  let actions = mconcat
-        [ foldMap S.insert add_ev
-        , foldMap S.delete remove_ev
+  let actions = appEndo $ mconcat
+        [ event mempty (foldMap $ Endo . S.insert) add_ev
+        , event mempty (foldMap $ Endo . S.delete) remove_ev
         ]
-  returnA -< dup $ actions kept
+  returnA -< (event mempty id add_ev, actions kept)
 
 
 runeTexture :: Rune -> GameTexture
