@@ -10,6 +10,11 @@ import Data.Word
 import Data.Foldable (for_)
 import Foreign.C
 
+
+drawOriginRect :: Color -> OriginRect Double -> V2 Double -> Renderable
+drawOriginRect c ore = drawFilledRect c . originRectToRect ore
+
+
 drawBackgroundColor :: Color -> Renderable
 drawBackgroundColor c e = do
   let renderer = e_renderer e

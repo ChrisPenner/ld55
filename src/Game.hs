@@ -13,8 +13,11 @@ import FRP.Yampa hiding (normalize, (*^))
 import GHC.Generics
 import ParseSpell (parseSpell)
 import Router
-import SDL hiding (Event, Stereo, Vector, copy)
+import SDL hiding (delay, Event, Stereo, Vector, copy)
 import Types
+import Prelude hiding (last)
+import Data.Ord (clamp)
+import Data.Monoid
 
 game :: SF FrameInfo Renderable
 game =
@@ -22,12 +25,6 @@ game =
     mconcat
      [ z
      , drawText 16 (V3 0 0 0) "yo what up" 30
-     , drawGameTextureOriginRect Texture_Rune1 (mkCenterdOriginRect 50) (V2 100 500) 0 (pure False)
-     , drawGameTextureOriginRect Texture_Rune2 (mkCenterdOriginRect 50) (V2 200 500) 0 (pure False)
-     , drawGameTextureOriginRect Texture_Rune3 (mkCenterdOriginRect 50) (V2 300 500) 0 (pure False)
-     , drawGameTextureOriginRect Texture_Rune4 (mkCenterdOriginRect 50) (V2 400 500) 0 (pure False)
-     , drawGameTextureOriginRect Texture_Rune5 (mkCenterdOriginRect 50) (V2 500 500) 0 (pure False)
-     , drawGameTextureOriginRect Texture_Rune6 (mkCenterdOriginRect 50) (V2 600 500) 0 (pure False)
      ]
        ) $
   fmap (foldMap oo_render) $
@@ -90,8 +87,10 @@ fireBall velocity = proc oi -> do
 
 ourDude :: Dude
 ourDude = proc oi -> do
-  dPos <- playerLogic -< fi_controls $ oi_fi oi
-  okPressed <- edge -< c_okButton . fi_controls $ oi_fi oi
+  let c = fi_controls $ oi_fi oi
+  dPos <- playerLogic -< c
+  (okPressed, draw_rune1) <- rune (V2 100 500) Texture_Rune1 -< c
+
   dirFacing <-
     hold (V2 1 0)
       <<< edgeBy
@@ -113,10 +112,13 @@ ourDude = proc oi -> do
   returnA
     -<
       ObjectOutput
-        { oo_outbox = mempty,
-          oo_commands = commands,
-          oo_render = renderGState newState,
-          oo_state = newState
+        { oo_outbox = mempty
+        , oo_commands = commands
+        , oo_render = mconcat
+            [ renderGState newState
+            , draw_rune1
+            ]
+        , oo_state = newState
         }
 
 renderGState :: GState -> Renderable
@@ -201,4 +203,39 @@ mkRotMatrix theta =
   V2
     (V2 (cos theta) (negate $ sin theta))
     (V2 (sin theta) (cos theta))
+
+
+cooldown :: Time -> SF (Event a) (Double, Event a, Event ())
+cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
+  t <- localTime -< ()
+  let is_ok = t >= ok_at
+
+  let gated_ev = gate ev is_ok
+  next_ok_at <- hold 0 -< (t + wait) <$ gated_ev
+
+  next_ok <- edge -< next_ok_at <= t
+  returnA -< ((clamp (0, 1) ((next_ok_at - t) / wait), gated_ev, next_ok), next_ok_at)
+
+rune :: V2 Double -> GameTexture -> SF Controller (Event (), Renderable)
+rune pos gt = proc c -> do
+  (perc_available, on_use, on_refresh) <- cooldown 2 <<< edge -< c_cancelButton c
+  end_refresh <- delayEvent 0.15 -< on_refresh
+  want_halo <- fmap getAny $ hold (Any False) -< mergeEvents
+    [ Any True  <$ on_refresh
+    , Any False <$ end_refresh
+    ]
+
+  let ore = mkCenterdOriginRect 50
+
+  returnA -<
+    ( on_use
+    , mconcat
+        [ drawOriginRect (V4 0 0 0 (round $ perc_available * 255)) ore pos
+        , drawGameTextureOriginRect gt ore pos 0 (pure False)
+        , if want_halo
+              then drawOriginRect (V4 255 255 0 32) ore pos
+              else mempty
+        ]
+    )
+
 
