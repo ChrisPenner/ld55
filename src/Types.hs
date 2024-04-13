@@ -97,7 +97,7 @@ type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
 data GameMsg k where
   Teleport :: GameMsg (V2 Double)
-  Dash :: GameMsg (Time {- dash time -}, Double {- dash speed -})
+  Dash :: GameMsg (Time {- dash time -}, Double {- dash speed multiplier -})
 
 deriving stock instance Eq (GameMsg k)
 
@@ -187,7 +187,7 @@ data Payload
         p_fireModifier :: Int
       }
   | MovementDesc
-      { p_speedModifier :: Float
+      { p_speedModifier :: Double
       }
   deriving stock (Eq, Ord, Show, Generic)
 

@@ -145,9 +145,9 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
   let mayStartDash = (snd <$> listToMaybe (getLetters Dash))
   let startDashEvent = maybeToEvent mayStartDash
   dashEndTime <- hold 0 -< (startDashEvent <&> \(dashTime, _) -> dashTime + lt)
-  endDashEvent <- edge -< dashEndTime <= lt
-  dashSpeedBoost <- hold 0 -< ((snd <$> startDashEvent) <|> (endDashEvent $> 0))
-  let speed = defaultSpeed + dashSpeedBoost
+  endDashEvent <- edge -< (dashEndTime + 0.1) < lt && isNoEvent startDashEvent
+  dashSpeedMult <- hold 1 -< ((snd <$> startDashEvent) <|> (endDashEvent $> 1))
+  let speed = defaultSpeed * dashSpeedMult
   dt <- deltaTime -< ()
   let dPos = c_leftStick c ^* speed ^* dt
   (draw_runes, new_runes) <-
@@ -321,17 +321,16 @@ makeSpells playerKey dir  =
                 oo_render = renderGState st,
                 oo_state = st
               }
-    (Explosion MovementDesc{} k) ->
+    (Explosion MovementDesc{p_speedModifier} k) ->
       pure $ proc oi -> do
         (_perc, _isDying, cmds) <- spellContinuation playerKey spellTtl dir k -< oi_state oi
         let st = oi_state oi
-        let dashSpeed = 500
         returnA
           -<
             ObjectOutput
-              { oo_outbox = [(playerKey, SomeMsg Dash (spellTtl, dashSpeed))],
+              { oo_outbox = [(playerKey, SomeMsg Dash (spellTtl, p_speedModifier))],
                 oo_commands = cmds,
-                oo_render = renderGState st,
+                oo_render = mempty,
                 oo_state = st
               }
     (Concurrent x y) ->

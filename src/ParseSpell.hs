@@ -45,7 +45,7 @@ finisherPayload :: Finisher -> Payload
 finisherPayload = \case
   Attack -> DamageDesc 1 0
   Defend -> DamageDesc (-1) 0
-  Move -> MovementDesc 1
+  Move -> MovementDesc 2
 
 runSpellMods :: [RuneModifier] -> Spell -> Spell
 runSpellMods mods spell = foldr applyMod spell mods
