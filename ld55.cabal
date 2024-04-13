@@ -1,0 +1,277 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.36.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           ld55
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/isovector/ld55#readme>
+homepage:       https://github.com/isovector/ld55#readme
+bug-reports:    https://github.com/isovector/ld55/issues
+author:         Sandy Maguire
+maintainer:     sandy@sandymaguire.me
+copyright:      2024 Sandy Maguire
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/isovector/ld55
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_ld55
+  autogen-modules:
+      Paths_ld55
+  hs-source-dirs:
+      src
+  default-extensions:
+      Arrows
+      BangPatterns
+      BinaryLiterals
+      ConstrainedClassMethods
+      ConstraintKinds
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      DoAndIfThenElse
+      EmptyCase
+      EmptyDataDecls
+      EmptyDataDeriving
+      ExistentialQuantification
+      ExplicitForAll
+      FlexibleContexts
+      FlexibleInstances
+      ForeignFunctionInterface
+      GADTSyntax
+      GeneralisedNewtypeDeriving
+      HexFloatLiterals
+      ImplicitPrelude
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MonomorphismRestriction
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NamedWildCards
+      NumDecimals
+      NumericUnderscores
+      PatternGuards
+      PolyKinds
+      PostfixOperators
+      RankNTypes
+      RelaxedPolyRec
+      ScopedTypeVariables
+      StandaloneDeriving
+      StandaloneKindSignatures
+      StarIsType
+      TraditionalRecordSyntax
+      TupleSections
+      TypeApplications
+      TypeOperators
+      TypeSynonymInstances
+      ViewPatterns
+      OverloadedLabels
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      ALUT
+    , JuicyPixels
+    , OpenGL
+    , Yampa
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , filepath
+    , generic-lens >=2.2.1.0
+    , ldtk-types
+    , lens
+    , linear
+    , mtl
+    , nspace
+    , sdl2
+    , text
+    , time
+    , vector
+  default-language: Haskell2010
+
+executable ld55-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_ld55
+  autogen-modules:
+      Paths_ld55
+  hs-source-dirs:
+      app
+  default-extensions:
+      Arrows
+      BangPatterns
+      BinaryLiterals
+      ConstrainedClassMethods
+      ConstraintKinds
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      DoAndIfThenElse
+      EmptyCase
+      EmptyDataDecls
+      EmptyDataDeriving
+      ExistentialQuantification
+      ExplicitForAll
+      FlexibleContexts
+      FlexibleInstances
+      ForeignFunctionInterface
+      GADTSyntax
+      GeneralisedNewtypeDeriving
+      HexFloatLiterals
+      ImplicitPrelude
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MonomorphismRestriction
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NamedWildCards
+      NumDecimals
+      NumericUnderscores
+      PatternGuards
+      PolyKinds
+      PostfixOperators
+      RankNTypes
+      RelaxedPolyRec
+      ScopedTypeVariables
+      StandaloneDeriving
+      StandaloneKindSignatures
+      StarIsType
+      TraditionalRecordSyntax
+      TupleSections
+      TypeApplications
+      TypeOperators
+      TypeSynonymInstances
+      ViewPatterns
+      OverloadedLabels
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      ALUT
+    , JuicyPixels
+    , OpenGL
+    , Yampa
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , filepath
+    , generic-lens >=2.2.1.0
+    , ld55
+    , ldtk-types
+    , lens
+    , linear
+    , mtl
+    , nspace
+    , sdl2
+    , text
+    , time
+    , vector
+  default-language: Haskell2010
+
+test-suite ld55-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_ld55
+  autogen-modules:
+      Paths_ld55
+  hs-source-dirs:
+      test
+  default-extensions:
+      Arrows
+      BangPatterns
+      BinaryLiterals
+      ConstrainedClassMethods
+      ConstraintKinds
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      DoAndIfThenElse
+      EmptyCase
+      EmptyDataDecls
+      EmptyDataDeriving
+      ExistentialQuantification
+      ExplicitForAll
+      FlexibleContexts
+      FlexibleInstances
+      ForeignFunctionInterface
+      GADTSyntax
+      GeneralisedNewtypeDeriving
+      HexFloatLiterals
+      ImplicitPrelude
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      MonomorphismRestriction
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NamedWildCards
+      NumDecimals
+      NumericUnderscores
+      PatternGuards
+      PolyKinds
+      PostfixOperators
+      RankNTypes
+      RelaxedPolyRec
+      ScopedTypeVariables
+      StandaloneDeriving
+      StandaloneKindSignatures
+      StarIsType
+      TraditionalRecordSyntax
+      TupleSections
+      TypeApplications
+      TypeOperators
+      TypeSynonymInstances
+      ViewPatterns
+      OverloadedLabels
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      ALUT
+    , JuicyPixels
+    , OpenGL
+    , Yampa
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , filepath
+    , generic-lens >=2.2.1.0
+    , ld55
+    , ldtk-types
+    , lens
+    , linear
+    , mtl
+    , nspace
+    , sdl2
+    , text
+    , time
+    , vector
+  default-language: Haskell2010

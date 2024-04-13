@@ -1,0 +1,13 @@
+resolver: lts-21.14
+
+packages:
+- .
+
+extra-deps:
+- Yampa-0.14.6
+- ldtk-types-1.2.3
+- sdl2-2.5.5.0
+- nspace-0.2.0.0
+- monoidal-containers-0.6.4.0
+
+
