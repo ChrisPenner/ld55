@@ -156,3 +156,30 @@ deriving via (Ap Y.Event a) instance Monoid a => Monoid (Y.Event a)
 deriving stock instance Foldable Y.Event
 
 deriving stock instance Traversable Y.Event
+
+data Payload
+  = DamageDesc
+    { damageToDo :: Int
+    , fireModifier :: Int
+    }
+  | MovementDesc
+    { speedModifier :: Float
+    }
+  deriving stock (Eq, Ord, Show, Generic)
+
+
+data Spell
+  = Projectile Payload (Maybe Spell)
+  | Explosion Payload  (Maybe Spell)
+  | Standard Payload
+  | Concurrent Spell Spell
+  deriving stock (Eq, Ord, Show, Generic)
+
+data Rune
+  = Rune2x
+  | RuneProjectile
+  | RuneExplosion
+  | RuneAndThen
+  | RuneNegate
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+
