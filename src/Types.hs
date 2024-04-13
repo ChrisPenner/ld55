@@ -9,9 +9,11 @@ module Types
   , module Data.Kind
   , module Data.Typeable
   , Map
+  , traceShowId
   )
   where
 
+import Debug.Trace (traceShowId)
 import Data.Monoid
 import Data.Generics.Labels ()
 import Data.Word

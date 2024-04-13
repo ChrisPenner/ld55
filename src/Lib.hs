@@ -4,14 +4,13 @@
 
 module Lib where
 
+import Game
 import Control.Lens
 import Control.Monad
 import Data.Generics.Labels ()
 import Data.IORef
 import Data.Time.Clock.System
-import Data.Word
 import FRP.Yampa hiding ((*^))
-import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
 import System.Exit
 import Types
@@ -68,47 +67,6 @@ main = do
     (output engine)
     game
   quit
-
-drawBackgroundColor :: Color -> Renderable
-drawBackgroundColor c e = do
-  let renderer = e_renderer e
-  rendererDrawColor renderer $= c
-  fillRect renderer Nothing
-
-game :: SF FrameInfo Renderable
-game = proc FrameInfo {fi_controls} -> do
-  playerLogic' <- playerLogic -< fi_controls
-  returnA -< (drawBackgroundColor (V4 255 0 255 255) <> drawFilledRect (ps_color playerLogic') (Rectangle (P (ps_position playerLogic')) (V2 100 100)))
-
-drawFilledRect :: Color -> Rectangle Double -> Renderable
-drawFilledRect c (Rectangle (P v) sz) engine = do
-  let rect' = Rectangle (P v) $ sz
-  let renderer = e_renderer engine
-  rendererDrawColor renderer $= c
-  fillRect renderer $ Just $ fmap round rect'
-
-data PlayerState = PlayerState
-  { ps_position :: V2 Double,
-    ps_color :: V4 Word8
-  }
-  deriving stock (Eq, Ord, Show, Generic)
-
-defaultPlayerState :: PlayerState
-defaultPlayerState =
-  PlayerState
-    { ps_position = 0,
-      ps_color = V4 255 0 0 255
-    }
-
-playerLogic :: SF Controller PlayerState
-playerLogic = loopPre defaultPlayerState $ proc (c, ps) -> do
-  t <- localTime -< ()
-  dt <- derivative -< t
-  let ps' = ps & #ps_position +~ c_leftStick c * playerSpeed ^* dt
-  returnA -< (ps', ps')
-  where
-    playerSpeed :: V2 Double
-    playerSpeed = 10
 
 parseControls :: (Scancode -> Bool) -> Controller
 parseControls isKeyDown =
