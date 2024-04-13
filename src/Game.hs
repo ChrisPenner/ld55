@@ -39,7 +39,6 @@ game num_players =
     mconcat
      [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False
      , z
-     , drawText 16 (V3 0 0 0) "yo what up" 30
      ]
        ) $
   fmap (foldMap oo_render) $
@@ -216,6 +215,8 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
   returnA
     -< let fontsize = 9
            margin = 1
+           str = show $ ps_health pstate
+           strlen = fromIntegral $ length str
         in
       ( ObjectOutput
           { oo_outbox = mempty
@@ -236,9 +237,9 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
                   (_, DamageSrc{..}) <- dmgsources
                   pure $ drawOriginRect (V4 255 0 0 128) ds_ore ds_pos
               , drawOriginRect (V4 0 0 0 192)
-                    (OriginRect (V2 (fontsize * 3 + 2 * margin) (fontsize + 2 * margin)) 0)
-                  $ pos + V2 (- fontsize * 1.5 - margin) (6 - margin)
-              , drawText fontsize (V3 255 255 255) (show $ ps_health pstate) (pos + V2 (- fontsize * 1.5) 6)
+                    (OriginRect (V2 (fontsize * strlen + 2 * margin) (fontsize + 2 * margin)) 0)
+                  $ pos + V2 (- fontsize * (strlen / 2) - margin) (6 - margin)
+              , drawText fontsize (V3 255 255 255) str (pos + V2 (- fontsize * (strlen / 2)) 6)
               ]
           , oo_state = newState
           }
