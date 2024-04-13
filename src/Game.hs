@@ -18,6 +18,7 @@ import Types
 import Prelude hiding (last)
 import Data.Ord (clamp)
 import Data.Monoid
+import Control.Applicative
 
 game :: SF FrameInfo Renderable
 game =
@@ -89,8 +90,8 @@ ourDude :: Dude
 ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (okPressed, draw_rune1) <- runeInput (V2 100 500) Texture_Rune1 <<< edge -< c_okButton c
-  (cancelPressed, draw_rune2) <- runeInput (V2 200 500) Texture_Rune2 <<< edge -< c_cancelButton c
+  (okPressed, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_okButton c
+  (cancelPressed, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_cancelButton c
 
   dirFacing <-
     hold (V2 1 0)
@@ -119,17 +120,17 @@ ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
           , oo_render = mconcat
               [ renderGState newState
               , mconcat $ do
-                  (ix, rt) <- zip [0..] pendingRunes
-                  let ore = mkCenterdOriginRect 20
-                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (ix * 15) (-30)) 0 (pure False)
+                  (i, rt) <- zip [0..] pendingRunes
+                  let ore = mkCenterdOriginRect $ V2 17 25
+                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (i * 20) (-30)) 0 (pure False)
               , draw_rune1
               , draw_rune2
               ]
           , oo_state = newState
           }
       , pendingRunes
-          <> onEvent' okPressed     Texture_Rune1
-          <> onEvent' cancelPressed Texture_Rune2
+          <> onEvent' okPressed     Texture_UnoSkip
+          <> onEvent' cancelPressed Texture_UnoWild
       )
 
 renderGState :: GState -> Renderable
@@ -231,20 +232,20 @@ runeInput :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
 runeInput pos gt = proc ev -> do
   (perc_available, on_use, on_refresh) <- cooldown 2 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
-  want_halo <- fmap getAny $ hold (Any False) -< mergeEvents
+  want_halo <- fmap getAny $ hold (Any False) -< asum
     [ Any True  <$ on_refresh
     , Any False <$ end_refresh
     ]
 
-  let ore = mkCenterdOriginRect 50
+  let ore = mkCenterdOriginRect $ V2 35 50
 
   returnA -<
     ( on_use
     , mconcat
-        [ drawOriginRect (V4 0 0 0 (round $ perc_available * 255)) ore pos
-        , drawGameTextureOriginRect gt ore pos 0 (pure False)
+        [ drawGameTextureOriginRect gt ore pos 0 (pure False)
+        , drawOriginRect (V4 0 0 0 (round $ perc_available * 255)) ore pos
         , if want_halo
-              then drawOriginRect (V4 255 255 0 32) ore pos
+              then drawOriginRect (V4 255 255 0 64) ore pos
               else mempty
         ]
     )

@@ -219,6 +219,10 @@ data GameTexture
   | Texture_Rune4
   | Texture_Rune5
   | Texture_Rune6
+  | Texture_UnoReverse
+  | Texture_UnoSkip
+  | Texture_UnoPlusTwo
+  | Texture_UnoWild
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 

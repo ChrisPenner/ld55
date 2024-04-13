@@ -46,6 +46,10 @@ textureName Texture_Rune3 = "rune3"
 textureName Texture_Rune4 = "rune4"
 textureName Texture_Rune5 = "rune5"
 textureName Texture_Rune6 = "rune6"
+textureName Texture_UnoSkip = "uno-skip"
+textureName Texture_UnoPlusTwo = "uno-plus2"
+textureName Texture_UnoReverse = "uno-reverse"
+textureName Texture_UnoWild = "uno-wild"
 
 wrapTexture :: Texture -> IO WrappedTexture
 wrapTexture t = do
