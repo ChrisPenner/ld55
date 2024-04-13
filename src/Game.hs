@@ -86,10 +86,11 @@ fireBall velocity = proc oi -> do
     ttl = 2
 
 ourDude :: Dude
-ourDude = proc oi -> do
+ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (okPressed, draw_rune1) <- rune (V2 100 500) Texture_Rune1 -< c
+  (okPressed, draw_rune1) <- rune (V2 100 500) Texture_Rune1 <<< edge -< c_okButton c
+  (cancelPressed, draw_rune2) <- rune (V2 200 500) Texture_Rune2 <<< edge -< c_cancelButton c
 
   dirFacing <-
     hold (V2 1 0)
@@ -109,17 +110,27 @@ ourDude = proc oi -> do
           ]
 
   let newState = oi_state oi & #gs_position +~ dPos
+      pos = gs_position newState
   returnA
     -<
-      ObjectOutput
-        { oo_outbox = mempty
-        , oo_commands = commands
-        , oo_render = mconcat
-            [ renderGState newState
-            , draw_rune1
-            ]
-        , oo_state = newState
-        }
+      ( ObjectOutput
+          { oo_outbox = mempty
+          , oo_commands = commands
+          , oo_render = mconcat
+              [ renderGState newState
+              , mconcat $ do
+                  (ix, rt) <- zip [0..] pendingRunes
+                  let ore = mkCenterdOriginRect 20
+                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (ix * 15) (-30)) 0 (pure False)
+              , draw_rune1
+              , draw_rune2
+              ]
+          , oo_state = newState
+          }
+      , pendingRunes
+          <> onEvent' okPressed     Texture_Rune1
+          <> onEvent' cancelPressed Texture_Rune2
+      )
 
 renderGState :: GState -> Renderable
 renderGState gs =
@@ -216,9 +227,9 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
   next_ok <- edge -< next_ok_at <= t
   returnA -< ((clamp (0, 1) ((next_ok_at - t) / wait), gated_ev, next_ok), next_ok_at)
 
-rune :: V2 Double -> GameTexture -> SF Controller (Event (), Renderable)
-rune pos gt = proc c -> do
-  (perc_available, on_use, on_refresh) <- cooldown 2 <<< edge -< c_cancelButton c
+rune :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
+rune pos gt = proc ev -> do
+  (perc_available, on_use, on_refresh) <- cooldown 2 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
   want_halo <- fmap getAny $ hold (Any False) -< mergeEvents
     [ Any True  <$ on_refresh
