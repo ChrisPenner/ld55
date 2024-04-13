@@ -10,7 +10,7 @@ import Data.Generics.Labels ()
 import Data.IORef
 import Data.Time.Clock.System
 import Data.Word
-import FRP.Yampa
+import FRP.Yampa hiding ((*^))
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
 import System.Exit
@@ -86,7 +86,7 @@ game = proc FrameInfo {fi_controls} -> do
   playerLogic' <- playerLogic -< fi_controls
   returnA -< (drawBackgroundColor (V4 255 0 255 255) <> drawFilledRect (ps_color playerLogic') (Rectangle (P (ps_position playerLogic')) (V2 100 100)))
 
-drawFilledRect :: Color -> Rectangle Float -> Renderable
+drawFilledRect :: Color -> Rectangle Double -> Renderable
 drawFilledRect c (Rectangle (P v) sz) engine = do
   let rect' = Rectangle (P v) $ sz
   let renderer = e_renderer engine
@@ -94,7 +94,7 @@ drawFilledRect c (Rectangle (P v) sz) engine = do
   fillRect renderer $ Just $ fmap round rect'
 
 data PlayerState = PlayerState
-  { ps_position :: V2 Float,
+  { ps_position :: V2 Double,
     ps_color :: V4 Word8
   }
   deriving stock (Eq, Ord, Show, Generic)
@@ -108,14 +108,16 @@ defaultPlayerState =
 
 playerLogic :: SF Controller PlayerState
 playerLogic = loopPre defaultPlayerState $ proc (c, ps) -> do
-  let ps' = ps & #ps_position +~ c_leftStick c * playerSpeed
+  t <- localTime -< ()
+  dt <- derivative -< t
+  let ps' = ps & #ps_position +~ c_leftStick c * playerSpeed ^* dt
   returnA -< (ps', ps')
   where
-    playerSpeed :: V2 Float
+    playerSpeed :: V2 Double
     playerSpeed = 10
 
 data Controller = Controller
-  { c_leftStick :: V2 Float,
+  { c_leftStick :: V2 Double,
     c_okButton :: Bool,
     c_cancelButton :: Bool
   }
