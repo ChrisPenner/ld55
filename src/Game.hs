@@ -214,7 +214,9 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
   sprite <- mkAnim Wizard -< (DrawSpriteDetails (LpcAnim dir anim) 0 $ pure False, pos)
 
   returnA
-    -<
+    -< let fontsize = 9
+           margin = 1
+        in
       ( ObjectOutput
           { oo_outbox = mempty
           , oo_commands = commands
@@ -233,6 +235,10 @@ ourDude ctrlix cty = loopPre (PlayerState [] 100) $ proc (oi, pstate) -> do
               , mconcat $ do
                   (_, DamageSrc{..}) <- dmgsources
                   pure $ drawOriginRect (V4 255 0 0 128) ds_ore ds_pos
+              , drawOriginRect (V4 0 0 0 192)
+                    (OriginRect (V2 (fontsize * 3 + 2 * margin) (fontsize + 2 * margin)) 0)
+                  $ pos + V2 (- fontsize * 1.5 - margin) (6 - margin)
+              , drawText fontsize (V3 255 255 255) (show $ ps_health pstate) (pos + V2 (- fontsize * 1.5) 6)
               ]
           , oo_state = newState
           }
@@ -341,6 +347,7 @@ mkRotMatrix theta =
   V2
     (V2 (cos theta) (negate $ sin theta))
     (V2 (sin theta) (cos theta))
+
 
 cooldown :: Time -> SF (Event a) (Double, Event a, Event ())
 cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
