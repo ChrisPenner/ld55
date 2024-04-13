@@ -9,7 +9,7 @@ import Control.Lens
 import Control.Monad
 import Data.Generics.Labels ()
 import Data.Map qualified as M
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, listToMaybe)
 import Data.Monoid
 import Data.Ord (clamp)
 import Data.Word
@@ -21,6 +21,7 @@ import Router
 import SDL hiding (Event, Stereo, Vector, copy, delay)
 import Types
 import Prelude hiding (last)
+import Data.Functor
 
 aspectRatio :: RealFloat a => a
 aspectRatio = 16 / 9
@@ -64,14 +65,6 @@ deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
   nowish <- localTime -< ()
   returnA -< (nowish - old, nowish)
-
-playerLogic :: SF (Controller) (V2 Double)
-playerLogic = proc c -> do
-  dt <- deltaTime -< ()
-  returnA -< c_leftStick c * playerSpeed ^* dt
-  where
-    playerSpeed :: V2 Double
-    playerSpeed = 100
 
 data FireballState = FireballState
   { fs_position :: V2 Double,
@@ -144,9 +137,19 @@ runRuneSet pos cty r1 r2 r3 r4 = proc c -> do
 
 ourDude :: Int -> ControllerType -> Dude
 ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
+  lt <- localTime -< ()
   let c = (!! ctrlix) $ fi_controls $ oi_fi oi
   let selfKey = oi_self oi
-  dPos <- playerLogic -< c
+  let getLetters :: Typeable v => GameMsg v -> [(Key, v)]
+      getLetters =  oi ^. #oi_inbox . to oie_mailbox
+  let mayStartDash = (snd <$> listToMaybe (getLetters Dash))
+  let startDashEvent = maybeToEvent mayStartDash
+  dashEndTime <- hold 0 -< (startDashEvent <&> \(dashTime, _) -> dashTime + lt)
+  endDashEvent <- edge -< dashEndTime <= lt
+  dashSpeedBoost <- hold 0 -< ((snd <$> startDashEvent) <|> (endDashEvent $> 0))
+  let speed = defaultSpeed + dashSpeedBoost
+  dt <- deltaTime -< ()
+  let dPos = c_leftStick c ^* speed ^* dt
   (draw_runes, new_runes) <-
     runRuneSet
       (V2 100 450 + V2 (fromIntegral ctrlix * 300) 0)
@@ -187,7 +190,6 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
             $ maybe []
                 (makeSpells selfKey (dirFacing * 300))
                 $ parseSpell Move pendingRunes
-  let getLetters =  oi ^. #oi_inbox . to oie_mailbox
   let mayTeleportTo = (getLetters Teleport ^? _head) <&> snd
   let newState = oi_state oi
                    & #gs_position +~ dPos
@@ -233,6 +235,8 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
       , event id (const $ const []) shoot $ pendingRunes
           <> new_runes
       )
+  where
+    defaultSpeed = 100
 
 renderGState :: GState -> Renderable
 renderGState gs =
@@ -302,7 +306,7 @@ makeSpells playerKey dir  =
                 oo_render = renderGState st,
                 oo_state = st
               }
-    (Explosion _ k) ->
+    (Explosion DamageDesc{} k) ->
       pure $ proc oi -> do
         (perc, _isDying, cmds) <- spellContinuation playerKey spellTtl dir k -< oi_state oi
         let st =
@@ -313,6 +317,19 @@ makeSpells playerKey dir  =
           -<
             ObjectOutput
               { oo_outbox = mempty,
+                oo_commands = cmds,
+                oo_render = renderGState st,
+                oo_state = st
+              }
+    (Explosion MovementDesc{} k) ->
+      pure $ proc oi -> do
+        (_perc, _isDying, cmds) <- spellContinuation playerKey spellTtl dir k -< oi_state oi
+        let st = oi_state oi
+        let dashSpeed = 500
+        returnA
+          -<
+            ObjectOutput
+              { oo_outbox = [(playerKey, SomeMsg Dash (spellTtl, dashSpeed))],
                 oo_commands = cmds,
                 oo_render = renderGState st,
                 oo_state = st

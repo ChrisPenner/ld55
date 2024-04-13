@@ -24,7 +24,7 @@ import Data.Monoid
 import Data.Typeable
 import Data.Word
 import Debug.Trace (traceShowId)
-import FRP.Yampa (SF)
+import FRP.Yampa (SF, Time)
 import FRP.Yampa qualified as Y
 import Foreign.C
 import GHC.Generics
@@ -97,6 +97,7 @@ type ObjSF msg c k s = SF (ObjectInput msg k s) (ObjectOutput msg c k s)
 
 data GameMsg k where
   Teleport :: GameMsg (V2 Double)
+  Dash :: GameMsg (Time {- dash time -}, Double {- dash speed -})
 
 deriving stock instance Eq (GameMsg k)
 

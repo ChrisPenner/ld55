@@ -20,7 +20,6 @@ import Data.Foldable
 import Data.Int
 import SDL.Input.GameController (ControllerButton(..), ControllerAxis (..))
 import SDL.Internal.Numbered (toNumber)
-import Debug.Trace (traceM)
 
 main :: IO ()
 main = do
@@ -104,9 +103,9 @@ parseController js = do
   b <- controllerButton js ControllerButtonB
   x <- controllerButton js ControllerButtonX
   y <- controllerButton js ControllerButtonY
-  l <- controllerButton js ControllerButtonBack
-  r <- controllerButton js ControllerButtonGuide
-  ok <- controllerButton js ControllerButtonRightShoulder
+  _l <- controllerButton js ControllerButtonBack
+  _r <- controllerButton js ControllerButtonGuide
+  _ok <- controllerButton js ControllerButtonRightShoulder
 
   dx <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftX
   dy <- axisPosition js $ fromIntegral $ toNumber ControllerAxisLeftY
