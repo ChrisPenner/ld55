@@ -240,7 +240,7 @@ data GameTexture
 data Dir = DirUp | DirLeft | DirDown | DirRight
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
-data AnimName = SpellCast | Thrust | Walk | Slash | Shoot | Die
+data AnimName = SpellCast | Thrust | Walk | Slash | Shoot | Die | Stand
   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
 
 data Anim = LpcAnim Dir AnimName

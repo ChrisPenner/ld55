@@ -174,7 +174,7 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
 
       anim =
         case vel == 0 of
-          True -> Slash
+          True -> Stand
           False -> Walk
 
       dir =

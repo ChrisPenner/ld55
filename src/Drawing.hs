@@ -10,13 +10,14 @@ import Data.Word
 import Data.Foldable (for_)
 import Foreign.C
 import FRP.Yampa
+import Data.Bool (bool)
 
 getLpcAnim :: Dir -> AnimName -> Int -> WrappedTexture -> WrappedTexture
 getLpcAnim dir anim frame wt = wt
   { wt_sourceRect
       = Just $ Rectangle
           (P $ V2 (fromIntegral frame)
-                  (fromIntegral $ fromEnum anim * 4 + fromEnum dir)
+                  (fromIntegral $ (bool (fromEnum anim) 0 $ anim == Stand) * 4 + fromEnum dir)
                 * 64)
           64
   , wt_size = 64
@@ -121,6 +122,7 @@ frameCounts Walk = 9
 frameCounts Slash = 6
 frameCounts Shoot = 13
 frameCounts Die = 6
+frameCounts Stand = 1
 
 mkAnim :: LpcGuy -> SF (DrawSpriteDetails, V2 Double) Renderable
 mkAnim guy = proc (dsd, pos) -> do
