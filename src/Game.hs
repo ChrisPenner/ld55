@@ -45,7 +45,7 @@ game num_players =
   fmap (foldMap oo_render) $
     router (maybe (Other 0)
                   (\case
-                    Player n -> Other 0
+                    Player _ -> Other 0
                     Other n -> Other $ n + 1
                   )
                   . fmap fst . M.lookupMax) mempty $
@@ -147,7 +147,13 @@ ourDude ctrlix cty = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = (!! ctrlix) $ fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
   (draw_runes, new_runes) <-
-    runRuneSet (V2 100 450 + V2 (fromIntegral ctrlix * 300) 0) cty (Left Rune2x) (Right RuneProjectile) (Right RuneExplosion) (Left RuneAndThen) -< c
+    runRuneSet
+      (V2 100 450 + V2 (fromIntegral ctrlix * 300) 0)
+      cty
+      (Left Rune2x)
+      (Right RuneProjectile)
+      (Right RuneExplosion)
+      (Left RuneAndThen) -< c
 
   shoot <- edge -< c_okButton c
 
