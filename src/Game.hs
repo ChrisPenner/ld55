@@ -128,12 +128,30 @@ onEvent ev f = foldMap (pure . f) ev
 onEvent' :: (Applicative f, Monoid (f b)) => Event a -> b -> f b
 onEvent' ev = onEvent ev . const
 
+spellContinuation
+    :: Time
+    -> V2 Double
+    -> Maybe Spell
+    -> SF GState (Double, [Command GameMsg GameCommand Key GState])
+spellContinuation ttl dir k = proc s -> do
+    (perc, on_die, die_cmds) <- withLifetime ttl -< ()
+    returnA -<
+      ( perc
+      , mconcat
+          [ die_cmds
+          , join $ onEvent' on_die $ do
+              spell <- maybeToList k
+              dude <- makeSpells dir spell
+              pure $ Spawn Nothing s dude
+          ]
+      )
+
 
 makeSpells :: V2 Double -> Spell -> [Dude]
 makeSpells _ (Standard _) = []
 makeSpells (normalize -> dir) (Projectile _ k) =
   pure $ proc oi -> do
-    (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
+    (_, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
     dt <- deltaTime -< ()
     let st = oi_state oi
           & #gs_position +~ dir * 400 ^* dt
@@ -142,33 +160,21 @@ makeSpells (normalize -> dir) (Projectile _ k) =
     returnA -<
       ObjectOutput
         { oo_outbox = mempty
-        , oo_commands = mconcat
-            [ die_cmds
-            , join $ onEvent' on_die $ do
-                spell <- maybeToList k
-                dude <- makeSpells dir spell
-                pure $ Spawn Nothing st dude
-            ]
+        , oo_commands = cmds
         , oo_render = renderGState st
         , oo_state = st
         }
 
 makeSpells dir (Explosion _ k) =
   pure $ proc oi -> do
-    (perc, on_die, die_cmds) <- withLifetime spellTtl -< ()
+    (perc, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
     let st = oi_state oi
           & #gs_size .~ perc *^ 100
           & #gs_color .~ V4 255 0 255 128
     returnA -<
       ObjectOutput
         { oo_outbox = mempty
-        , oo_commands = mconcat
-            [ die_cmds
-            , join $ onEvent' on_die $ do
-                spell <- maybeToList k
-                dude <- makeSpells dir spell
-                pure $ Spawn Nothing st dude
-            ]
+        , oo_commands = cmds
         , oo_render = renderGState st
         , oo_state = st
         }
