@@ -6,7 +6,9 @@ import System.Environment.Blank
 import Types
 import Data.Traversable
 import SDL.JuicyPixels (loadJuicyTexture)
-import SDL.Video (Renderer)
+import SDL.Video (Renderer, TextureInfo (..))
+import SDL (Texture, queryTexture)
+import Linear
 
 resourceRootPath :: IO FilePath
 resourceRootPath =
@@ -23,10 +25,34 @@ loadResources :: Renderer -> IO Resources
 loadResources renderer = do
   rpath <- resourceRootPath
 
-  font <- fmap M.fromList $ for [32 .. 122] $ \i -> do
+  fontmap <- fmap M.fromList $ for [32 .. 122] $ \i -> do
     t <- loadJuicyTexture renderer $ rpath </> "font" </> "font-" <> pad 3 '0' (show i) <.> "png"
     pure (toEnum i, t)
 
+  texmap <- fmap M.fromList $ for [minBound .. maxBound] $ \gt -> do
+    t <- loadJuicyTexture renderer $ rpath </> "sprites" </> textureName gt <.> "png"
+    wt <- wrapTexture t
+    pure (gt, wt)
+
   pure $ Resources
-    { r_font = (font M.!)
+    { r_font = (fontmap M.!)
+    , r_textures = (texmap M.!)
+    }
+
+textureName :: GameTexture -> String
+textureName Texture_Rune1 = "rune1"
+textureName Texture_Rune2 = "rune2"
+textureName Texture_Rune3 = "rune3"
+textureName Texture_Rune4 = "rune4"
+textureName Texture_Rune5 = "rune5"
+textureName Texture_Rune6 = "rune6"
+
+wrapTexture :: Texture -> IO WrappedTexture
+wrapTexture t = do
+  q <- queryTexture t
+  pure $ WrappedTexture
+    { getTexture = t
+    , wt_size = V2 (textureWidth q) $ textureHeight q
+    , wt_sourceRect = Nothing
+    , wt_origin = 0
     }

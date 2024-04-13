@@ -27,6 +27,7 @@ import FRP.Yampa (SF)
 import FRP.Yampa qualified as Y
 import GHC.Generics
 import SDL hiding (Stereo, Vector, copy)
+import Foreign.C
 
 type Color = V4 Word8
 
@@ -198,5 +199,56 @@ data Finisher = Attack | Defend | Move
 
 data Resources = Resources
   { r_font :: Char -> Texture
+  , r_textures :: GameTexture -> WrappedTexture
   }
   deriving stock (Generic)
+
+data WrappedTexture = WrappedTexture
+  { getTexture    :: Texture
+  , wt_sourceRect :: Maybe (Rectangle CInt)
+  , wt_size       :: V2 CInt
+  , wt_origin     :: V2 CInt
+  }
+  deriving stock Generic
+
+
+data GameTexture
+  = Texture_Rune1
+  | Texture_Rune2
+  | Texture_Rune3
+  | Texture_Rune4
+  | Texture_Rune5
+  | Texture_Rune6
+  deriving stock (Eq, Ord, Show, Enum, Bounded)
+
+
+
+
+data OriginRect aff = OriginRect
+  { orect_size   :: V2 aff
+  , orect_offset :: V2 aff
+  }
+  deriving (Eq, Ord, Show, Functor, Generic)
+
+orTopLeft :: Num a => V2 a -> OriginRect a -> V2 a
+orTopLeft pos ore = pos - orect_offset ore
+
+originRectToRect :: Num a => OriginRect a -> V2 a -> Rectangle a
+originRectToRect ore pos =
+  Rectangle (P $ orTopLeft pos ore)
+    $ orect_size ore
+
+
+
+wrappedToOriginRect :: WrappedTexture -> OriginRect Double
+wrappedToOriginRect wt = fmap fromIntegral $ OriginRect
+  { orect_size = wt_size wt
+  , orect_offset = wt_origin wt
+  }
+
+
+mkCenterdOriginRect :: Fractional a => V2 a -> OriginRect a
+mkCenterdOriginRect sz = OriginRect sz (sz / 2)
+
+mkGroundOriginRect :: Fractional a => V2 a -> OriginRect a
+mkGroundOriginRect sz@(V2 x y) = OriginRect sz $ V2 (x / 2) y

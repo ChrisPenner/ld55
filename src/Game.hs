@@ -18,7 +18,18 @@ import Types
 
 game :: SF FrameInfo Renderable
 game =
-  fmap (<> drawText 16 (V3 0 0 0) "yo what up" 30) $
+  fmap (\z ->
+    mconcat
+     [ z
+     , drawText 16 (V3 0 0 0) "yo what up" 30
+     , drawGameTextureOriginRect Texture_Rune1 (mkCenterdOriginRect 50) (V2 100 500) 0 (pure False)
+     , drawGameTextureOriginRect Texture_Rune2 (mkCenterdOriginRect 50) (V2 200 500) 0 (pure False)
+     , drawGameTextureOriginRect Texture_Rune3 (mkCenterdOriginRect 50) (V2 300 500) 0 (pure False)
+     , drawGameTextureOriginRect Texture_Rune4 (mkCenterdOriginRect 50) (V2 400 500) 0 (pure False)
+     , drawGameTextureOriginRect Texture_Rune5 (mkCenterdOriginRect 50) (V2 500 500) 0 (pure False)
+     , drawGameTextureOriginRect Texture_Rune6 (mkCenterdOriginRect 50) (V2 600 500) 0 (pure False)
+     ]
+       ) $
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
       ObjectMap mempty $ M.fromList $
