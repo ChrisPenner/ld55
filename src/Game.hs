@@ -34,8 +34,8 @@ screenSize = V2 (h * aspectRatio) h
   where
     h = 540
 
-game :: SF FrameInfo Renderable
-game =
+game :: Int -> SF FrameInfo Renderable
+game num_players =
   fmap (\z ->
     mconcat
      [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False
@@ -45,19 +45,9 @@ game =
        ) $
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
-      ObjectMap mempty $ M.fromList $
-        (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude))
-        : zip [1..] (fmap (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30},)
-               $ makeSpells (V2 1 1)
-               $ traceShowId $ parseSpell
-                        Attack
-                        [ Rune2x,
-                          RuneProjectile,
-                          RuneAndThen,
-                          RuneNegate,
-                          RuneExplosion
-                        ]
-                    )
+      ObjectMap mempty $ M.fromList $ do
+        i <- [0 .. num_players - 1]
+        pure $ (i, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i))
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -101,18 +91,18 @@ fireBall velocity = proc oi -> do
   where
     ttl = 2
 
-ourDude :: Dude
-ourDude = loopPre [] $ proc (oi, pendingRunes) -> do
-  let c = fi_controls $ oi_fi oi
+ourDude :: Int -> Dude
+ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
+  let c = (!! controller) $ fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (r1, draw_rune1) <- runeInput (V2 100 500) Texture_UnoSkip <<< edge -< c_zButton c
-  (r2, draw_rune2) <- runeInput (V2 150 500) Texture_UnoWild <<< edge -< c_xButton c
-  (r3, draw_rune3) <- runeInput (V2 200 500) Texture_UnoSkip <<< edge -< c_cButton c
-  (r4, draw_rune4) <- runeInput (V2 250 500) Texture_UnoPlusTwo <<< edge -< c_vButton c
+  (r1, draw_rune1) <- runeInput (V2 (fromIntegral controller * 300 + 100) 500) Texture_UnoSkip <<< edge -< c_zButton c
+  (r2, draw_rune2) <- runeInput (V2 (fromIntegral controller * 300 + 150) 500) Texture_UnoWild <<< edge -< c_xButton c
+  (r3, draw_rune3) <- runeInput (V2 (fromIntegral controller * 300 + 200) 500) Texture_UnoSkip <<< edge -< c_cButton c
+  (r4, draw_rune4) <- runeInput (V2 (fromIntegral controller * 300 + 250) 500) Texture_UnoPlusTwo <<< edge -< c_vButton c
 
   shoot <- edge -< c_okButton c
 
-  let vel = oi ^. #oi_fi . #fi_controls . #c_leftStick
+  let vel = c_leftStick c
 
   dirFacing <- fmap normalize $
     hold (V2 1 0)

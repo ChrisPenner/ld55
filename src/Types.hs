@@ -62,7 +62,7 @@ defaultControls =
     }
 
 data FrameInfo = FrameInfo
-  { fi_controls :: Controller,
+  { fi_controls :: [Controller],
     fi_engine :: Engine
   }
   deriving stock (Generic)
