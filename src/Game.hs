@@ -4,6 +4,7 @@
 
 module Game where
 
+import GHC.Generics
 import Control.Lens
 import Control.Monad
 import Data.Generics.Labels ()
@@ -47,7 +48,7 @@ game num_players =
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
       ObjectMap mempty $ M.fromList $ do
         i <- [0 .. num_players - 1]
-        pure $ (i, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i))
+        pure $ (i, (GState {gs_position = 200 + V2 (fromIntegral i * 200) 0, gs_color = V4 255 0 0 255, gs_size = 15}, ourDude i))
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -95,10 +96,10 @@ ourDude :: Int -> Dude
 ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
   let c = (!! controller) $ fi_controls $ oi_fi oi
   dPos <- playerLogic -< c
-  (r1, draw_rune1) <- runeInput (V2 (fromIntegral controller * 300 + 100) 500) Texture_UnoSkip <<< edge -< c_zButton c
-  (r2, draw_rune2) <- runeInput (V2 (fromIntegral controller * 300 + 150) 500) Texture_UnoWild <<< edge -< c_xButton c
-  (r3, draw_rune3) <- runeInput (V2 (fromIntegral controller * 300 + 200) 500) Texture_UnoSkip <<< edge -< c_cButton c
-  (r4, draw_rune4) <- runeInput (V2 (fromIntegral controller * 300 + 250) 500) Texture_UnoPlusTwo <<< edge -< c_vButton c
+  (r1, draw_rune1) <- runeInput (V2 (fromIntegral controller * 300 + 100) 500) Rune2x <<< edge -< c_zButton c
+  (r2, draw_rune2) <- runeInput (V2 (fromIntegral controller * 300 + 150) 500) RuneProjectile <<< edge -< c_xButton c
+  (r3, draw_rune3) <- runeInput (V2 (fromIntegral controller * 300 + 200) 500) RuneExplosion <<< edge -< c_cButton c
+  (r4, draw_rune4) <- runeInput (V2 (fromIntegral controller * 300 + 250) 500) RuneAndThen <<< edge -< c_vButton c
 
   shoot <- edge -< c_okButton c
 
@@ -158,8 +159,10 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
                   let stride = 20
                       offset = fromIntegral ((length pendingRunes - 1) * stride) / 2
                   (i, rt) <- zip [id @Int 0..] pendingRunes
-                  let ore = mkCenterdOriginRect $ V2 17 25
-                  pure $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-30)) 0 (pure False)
+                  let ore = mkGroundOriginRect $ V2 17 25
+                  pure
+                    $ drawGameTextureOriginRect rt ore (pos + V2 (fromIntegral i * stride - offset) (-64)) 0
+                    $ pure False
               , draw_rune1
               , draw_rune2
               , draw_rune3
@@ -168,10 +171,10 @@ ourDude controller = loopPre [] $ proc (oi, pendingRunes) -> do
           , oo_state = newState
           }
       , event id (const $ const []) shoot $ pendingRunes
-          <> onEvent' r1 Texture_UnoSkip
-          <> onEvent' r2 Texture_UnoWild
-          <> onEvent' r3 Texture_UnoSkip
-          <> onEvent' r4 Texture_UnoPlusTwo
+          <> onEvent r1 runeTexture
+          <> onEvent r2 runeTexture
+          <> onEvent r3 runeTexture
+          <> onEvent r4 runeTexture
       )
 
 renderGState :: GState -> Renderable
@@ -270,7 +273,7 @@ cooldown wait = loopPre 0 $ proc (ev, ok_at) -> do
   next_ok <- edge -< next_ok_at <= t
   returnA -< ((clamp (0, 1) ((next_ok_at - t) / wait), gated_ev, next_ok), next_ok_at)
 
-runeInput :: V2 Double -> GameTexture -> SF (Event a) (Event a, Renderable)
+runeInput :: V2 Double -> Rune -> SF (Event a) (Event Rune, Renderable)
 runeInput pos gt = proc ev -> do
   (perc_available, on_use, on_refresh) <- cooldown 3 -< ev
   end_refresh <- delayEvent 0.15 -< on_refresh
@@ -282,14 +285,22 @@ runeInput pos gt = proc ev -> do
   let ore = mkCenterdOriginRect $ V2 35 50
 
   returnA -<
-    ( on_use
+    ( gt <$ on_use
     , mconcat
-        [ drawGameTextureOriginRect gt ore pos 0 (pure False)
+        [ drawGameTextureOriginRect (runeTexture gt) ore pos 0 (pure False)
         , drawOriginRect (V4 0 0 0 (round $ if perc_available == 0 then 0 else max 92 (perc_available * 255))) ore pos
         , if want_halo
               then drawOriginRect (V4 255 255 0 64) ore pos
               else mempty
         ]
     )
+
+
+runeTexture :: Rune -> GameTexture
+runeTexture Rune2x = Texture_UnoPlusTwo
+runeTexture RuneProjectile = Texture_UnoWild
+runeTexture RuneExplosion = Texture_UnoReverse
+runeTexture RuneAndThen = Texture_UnoSkip
+runeTexture _ = Texture_Rune1
 
 
