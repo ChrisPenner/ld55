@@ -50,6 +50,7 @@ textureName Texture_UnoSkip = "uno-skip"
 textureName Texture_UnoPlusTwo = "uno-plus2"
 textureName Texture_UnoReverse = "uno-reverse"
 textureName Texture_UnoWild = "uno-wild"
+textureName Texture_Background = "background"
 
 wrapTexture :: Texture -> IO WrappedTexture
 wrapTexture t = do

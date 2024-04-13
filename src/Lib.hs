@@ -16,17 +16,6 @@ import System.Exit
 import Types
 import Resources (loadResources)
 
-aspectRatio :: RealFloat a => a
-aspectRatio = 16 / 9
-
-logicalSize :: RealFloat a => V2 a
-logicalSize = screenSize
-
-screenSize :: RealFloat a => V2 a
-screenSize = V2 (h * aspectRatio) h
-  where
-    h = 540
-
 main :: IO ()
 main = do
   -- ALUT.withProgNameAndArgs ALUT.runALUT $ \_ _ -> do

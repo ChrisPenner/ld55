@@ -20,11 +20,24 @@ import Data.Ord (clamp)
 import Data.Monoid
 import Control.Applicative
 
+
+aspectRatio :: RealFloat a => a
+aspectRatio = 16 / 9
+
+logicalSize :: RealFloat a => V2 a
+logicalSize = screenSize
+
+screenSize :: RealFloat a => V2 a
+screenSize = V2 (h * aspectRatio) h
+  where
+    h = 540
+
 game :: SF FrameInfo Renderable
 game =
   fmap (\z ->
     mconcat
-     [ z
+     [ drawGameTextureOriginRect Texture_Background (OriginRect screenSize 0) 0 0 $ pure False
+     , z
      , drawText 16 (V3 0 0 0) "yo what up" 30
      ]
        ) $

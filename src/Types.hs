@@ -227,6 +227,7 @@ data GameTexture
   | Texture_UnoSkip
   | Texture_UnoPlusTwo
   | Texture_UnoWild
+  | Texture_Background
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 
