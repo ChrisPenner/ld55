@@ -20,15 +20,11 @@ game :: SF FrameInfo Renderable
 game =
   fmap (foldMap oo_render) $
     router (maybe 0 (+ 1) . fmap fst . M.lookupMax) mempty $
-      ObjectMap mempty $
-        M.fromList $
-          [ (0, (GState {gs_position = 0, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude)),
-            ( 1,
-              ( GState {gs_position = 300, gs_color = V4 255 0 0 255, gs_size = 30},
-                head $
-                  makeSpells
-                    (V2 1 1)
-                    ( parseSpell
+      ObjectMap mempty $ M.fromList $
+        (0, (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30}, ourDude))
+        : zip [1..] (fmap (GState {gs_position = 200, gs_color = V4 255 0 0 255, gs_size = 30},)
+               $ makeSpells (V2 1 1)
+               $ traceShowId $ parseSpell
                         Attack
                         [ Rune2x,
                           RuneProjectile,
@@ -37,15 +33,6 @@ game =
                           RuneExplosion
                         ]
                     )
-              )
-            )
-          ]
-
--- \$ Projectile undefined
--- \$ Just
--- \$ Explosion undefined
--- \$ Just
--- \$ Projectile undefined Nothing
 
 deltaTime :: SF () Time
 deltaTime = loopPre 0 $ proc (_, old) -> do
@@ -182,16 +169,24 @@ makeSpells (normalize -> dir) (Projectile _ k) =
 makeSpells dir (Explosion _ k) =
   pure $ proc oi -> do
     (perc, cmds) <- spellContinuation spellTtl dir k -< oi_state oi
-    let st =
-          oi_state oi
-            & #gs_size .~ perc *^ 100
-            & #gs_color .~ V4 255 0 255 128
-    returnA
-      -<
-        ObjectOutput
-          { oo_outbox = mempty,
-            oo_commands = cmds,
-            oo_render = renderGState st,
-            oo_state = st
-          }
-makeSpells dir (Concurrent x y) = makeSpells dir x <> makeSpells dir y
+    let st = oi_state oi
+          & #gs_size .~ perc *^ 100
+          & #gs_color .~ V4 255 0 255 128
+    returnA -<
+      ObjectOutput
+        { oo_outbox = mempty
+        , oo_commands = cmds
+        , oo_render = renderGState st
+        , oo_state = st
+        }
+makeSpells dir (Concurrent x y) =
+  makeSpells (mkRotMatrix (pi / 10) !* dir) x
+   <> makeSpells (mkRotMatrix (-pi / 10) !* dir) y
+
+
+mkRotMatrix :: Double -> M22 Double
+mkRotMatrix theta =
+  V2
+    (V2 (cos theta) (negate $ sin theta))
+    (V2 (sin theta) (cos theta))
+
